@@ -312,7 +312,7 @@ export default function DashboardPage() {
               </label>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-accent"
                 onClick={handleExport}
               >
                 Exporter Excel

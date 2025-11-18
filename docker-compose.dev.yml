@@ -23,12 +23,16 @@ services:
       dockerfile: Dockerfile.dev
     container_name: mission_banque_web_dev
     ports:
-      - "3000:3000"
+      - "0.0.0.0:3000:3000"
     environment:
       DATABASE_URL: postgresql://mission_banque_user:mission_banque_password@db:5432/mission_banque_db
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       ADMIN_PASSWORD: admin123
       NODE_ENV: development
+      # Définir votre IP locale ici pour l'affichage dans les logs
+      HOST_IP: 192.168.1.65
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - .:/app
       - /app/node_modules

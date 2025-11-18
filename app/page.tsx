@@ -375,15 +375,15 @@ export default function HomePage() {
 
   const handleCloseBareme = () => {
     setShowBareme(false);
-    toast.error('Fenêtre fermée.');
+    // Pas de toast sur fermeture du barème
   };
 
   const activeVolet = volets.find((v) => v.id === selectedVolet);
 
   return (
-    <div className="max-w-4xl mx-auto px-4">
+    <div className="max-w-4xl mx-auto px-2 sm:px-4 overflow-x-hidden w-full">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-center">
-        Évaluation des Banques
+        Contrôle des Banques
       </h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -516,38 +516,39 @@ export default function HomePage() {
 
         {/* Évaluation des rubriques */}
         {activeVolet && activeVolet.rubriques && activeVolet.rubriques.length > 0 && (
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="card-title">{activeVolet.libelle}</h2>
+          <div className="card bg-base-100 shadow-xl overflow-x-hidden">
+            <div className="card-body p-4 sm:p-6 overflow-x-hidden">
+              <div className="flex items-center justify-between mb-4 gap-2">
+                <h2 className="card-title text-sm sm:text-base md:text-lg truncate">{activeVolet.libelle}</h2>
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline"
+                  className="btn btn-sm btn-outline flex-shrink-0"
                   onClick={() => setShowBareme(true)}
                 >
-                  <Info size={16} className="mr-2" />
-                  Afficher le barème
+                  <Info size={16} className="mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Afficher le barème</span>
+                  <span className="sm:hidden">Barème</span>
                 </button>
               </div>
 
               {/* Modal du barème */}
               {showBareme && (
                 <div className="modal modal-open">
-                  <div className="modal-box" ref={baremeModalRef}>
+                  <div className="modal-box max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" ref={baremeModalRef}>
                     <h3 className="font-bold text-lg mb-4">Barème d'évaluation</h3>
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                       {bareme.map((item) => (
                         <div key={item.note} className="border-b pb-2">
-                          <div className="font-semibold">
+                          <div className="font-semibold break-words">
                             {item.note} - {item.libelle}
                           </div>
                           {item.description && (
-                            <div className="text-sm text-gray-400">{item.description}</div>
+                            <div className="text-sm text-gray-400 break-words">{item.description}</div>
                           )}
                         </div>
                       ))}
                     </div>
-                    <div className="modal-action">
+                    <div className="modal-action sticky bottom-0 bg-base-100 pt-4">
                       <button
                         type="button"
                         className="btn btn-error"
@@ -560,7 +561,7 @@ export default function HomePage() {
                 </div>
               )}
 
-              <div className="space-y-4">
+              <div className="space-y-4 overflow-x-hidden">
                 {activeVolet.rubriques.map((rubrique) => {
                   const evaluation = evaluations[rubrique.id] || {
                     rubriqueId: rubrique.id,
@@ -570,10 +571,10 @@ export default function HomePage() {
                     showDetails: false,
                   };
                   return (
-                    <div key={rubrique.id} className="border rounded-lg p-4">
+                    <div key={rubrique.id} className="border rounded-lg p-3 sm:p-4 overflow-x-hidden">
                       {/* Afficher directement la composante évaluée comme titre avec le numéro */}
                       <div className="mb-3">
-                        <span className="font-semibold text-lg">
+                        <span className="font-semibold text-base sm:text-lg break-words">
                           {rubrique.composante_evaluee 
                             ? (rubrique.composante_evaluee.match(/^\d+[–-]/) 
                                 ? rubrique.composante_evaluee.replace(/^(\d+)[–-]/, `${rubrique.numero}-`)
@@ -587,11 +588,12 @@ export default function HomePage() {
                       {!evaluation.showDetails && (rubrique.criteres_indicateurs || rubrique.mode_verification) && (
                         <button
                           type="button"
-                          className="btn btn-sm btn-outline mb-4"
+                          className="btn btn-sm btn-outline mb-4 w-full sm:w-auto"
                           onClick={() => toggleDetails(rubrique.id)}
                         >
-                          <Info size={16} className="mr-2" />
-                          Afficher les détails (Critères / Mode de vérification)
+                          <Info size={16} className="mr-1 sm:mr-2 flex-shrink-0" />
+                          <span className="hidden sm:inline">Afficher les détails (Critères / Mode de vérification)</span>
+                          <span className="sm:hidden">Détails</span>
                         </button>
                       )}
 
@@ -601,34 +603,35 @@ export default function HomePage() {
                           ref={(el) => {
                             detailsRefs.current[rubrique.id] = el;
                           }}
-                          className="mb-4 border-2 border-primary/20 rounded-lg p-4 md:p-6 bg-base-100 shadow-sm"
+                          className="mb-4 border-2 border-primary/20 rounded-lg p-4 md:p-6 bg-base-100 shadow-sm max-h-[60vh] overflow-y-auto"
                         >
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-4">
                             {rubrique.criteres_indicateurs && (
-                              <div className="space-y-2">
+                              <div className="space-y-2 min-w-0">
                                 <h4 className="font-bold text-base text-primary">Critères / Indicateurs:</h4>
-                                <p className="text-base leading-relaxed whitespace-pre-wrap">
+                                <p className="text-base leading-relaxed whitespace-pre-wrap break-words">
                                   {rubrique.criteres_indicateurs}
                                 </p>
                               </div>
                             )}
                             {rubrique.mode_verification && (
-                              <div className="space-y-2">
+                              <div className="space-y-2 min-w-0">
                                 <h4 className="font-bold text-base text-primary">Mode de vérification:</h4>
-                                <p className="text-base leading-relaxed whitespace-pre-wrap">
+                                <p className="text-base leading-relaxed whitespace-pre-wrap break-words">
                                   {rubrique.mode_verification}
                                 </p>
                               </div>
                             )}
                           </div>
-                          <div className="flex justify-end pt-2 border-t border-base-300">
+                          <div className="flex justify-end pt-2 border-t border-base-300 sticky bottom-0 bg-base-100">
                             <button
                               type="button"
                               className="btn btn-sm btn-ghost"
                               onClick={() => toggleDetails(rubrique.id)}
                             >
-                              <X size={16} className="mr-2" />
-                              Masquer les détails
+                              <X size={16} className="mr-1 sm:mr-2" />
+                              <span className="hidden sm:inline">Masquer les détails</span>
+                              <span className="sm:hidden">Masquer</span>
                             </button>
                           </div>
                         </div>
@@ -661,28 +664,29 @@ export default function HomePage() {
                       {!evaluation.showObservations ? (
                         <button
                           type="button"
-                          className="btn btn-sm btn-ghost"
+                          className="btn btn-sm btn-ghost w-full sm:w-auto"
                           onClick={() => toggleObservations(rubrique.id)}
                         >
-                          <Plus size={16} className="mr-2" />
-                          Ajouter une observation / recommandation
+                          <Plus size={16} className="mr-1 sm:mr-2 flex-shrink-0" />
+                          <span className="hidden sm:inline">Ajouter une observation / recommandation</span>
+                          <span className="sm:hidden">Observation</span>
                         </button>
                       ) : (
-                        <div className="form-control">
+                        <div className="form-control max-h-[50vh] overflow-y-auto">
                           <div className="flex items-center justify-between mb-2">
                             <label className="label">
                               <span className="label-text">Observations / Recommandations</span>
                             </label>
                             <button
                               type="button"
-                              className="btn btn-xs btn-ghost"
+                              className="btn btn-xs btn-ghost flex-shrink-0"
                               onClick={() => toggleObservations(rubrique.id)}
                             >
                               <X size={14} />
                             </button>
                           </div>
                           <textarea
-                            className="textarea textarea-bordered"
+                            className="textarea textarea-bordered resize-none w-full"
                             rows={3}
                             value={evaluation.commentaire || ''}
                             onChange={(e) =>
@@ -712,7 +716,7 @@ export default function HomePage() {
           </button>
           <button
             type="submit"
-            className="btn btn-primary flex-1"
+            className="btn btn-accent flex-1"
             disabled={isSubmitting}
           >
             {isSubmitting ? 'Enregistrement...' : 'Valider'}

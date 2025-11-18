@@ -7,8 +7,8 @@ import ToastProvider from './components/ToastProvider';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Mission Suivi Banque - Évaluation des Banques',
-  description: 'Plateforme d\'évaluation des banques par des agents de terrain',
+  title: 'ContrôleBanqueDGSF - Contrôle des Banques',
+  description: 'Plateforme de contrôle des banques par des agents de terrain',
 };
 
 export default function RootLayout({
@@ -17,10 +17,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" data-theme="dark">
-      <body className={inter.className}>
+    <html lang="fr" data-theme="dark" className="overflow-x-hidden">
+      <body className={`${inter.className} overflow-x-hidden`}>
         <Navigation />
-        <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 pt-20 sm:pt-24">{children}</main>
+        <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 pt-20 sm:pt-24 overflow-x-hidden w-full">{children}</main>
         <ToastProvider />
       </body>
     </html>

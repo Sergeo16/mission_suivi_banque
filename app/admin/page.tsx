@@ -96,12 +96,18 @@ export default function AdminPage() {
   }, [filterVille]);
 
   const handleExport = async () => {
+    // Vérifier que le volet est sélectionné (obligatoire)
+    if (!filterVolet) {
+      toast.error('Veuillez sélectionner un volet avant d\'exporter');
+      return;
+    }
+
     try {
       const params = new URLSearchParams();
       if (filterVille) params.append('villeId', filterVille.toString());
       if (filterEtablissement) params.append('etablissementId', filterEtablissement.toString());
       if (filterControleur) params.append('controleurId', filterControleur.toString());
-      if (filterVolet) params.append('voletId', filterVolet.toString());
+      params.append('voletId', filterVolet.toString()); // Obligatoire
       if (filterPeriode) {
         const periode = periodes.find((p) => p.id === filterPeriode);
         if (periode) {
@@ -318,7 +324,7 @@ export default function AdminPage() {
 
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text">Volet</span>
+                  <span className="label-text">Volet *</span>
                 </label>
                 <select
                   className="select select-bordered"
@@ -327,8 +333,9 @@ export default function AdminPage() {
                     const voletId = e.target.value ? parseInt(e.target.value, 10) : null;
                     setFilterVolet(voletId);
                   }}
+                  required
                 >
-                  <option value="">Tous les volets</option>
+                  <option value="">Sélectionner un volet (obligatoire)</option>
                   {volets.map((volet) => (
                     <option key={volet.id} value={volet.id}>
                       {volet.libelle}
@@ -341,7 +348,7 @@ export default function AdminPage() {
             <div className="flex justify-end">
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-accent"
                 onClick={handleExport}
               >
                 <Download className="mr-2" size={16} />

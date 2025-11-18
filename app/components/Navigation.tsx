@@ -17,7 +17,7 @@ export default function Navigation() {
             onClick={() => setIsOpen(false)}
           >
             <Building2 className="mr-2 text-accent" />
-            Mission<span className="text-accent">Banque</span>
+            Contrôle<span className="text-accent">BanqueDGSF</span>
           </Link>
 
           <ul className="hidden md:flex items-center space-x-6 md:pb-3">
