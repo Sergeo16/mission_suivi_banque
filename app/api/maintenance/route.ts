@@ -1,26 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isMaintenanceMode, setMaintenanceMode } from '@/lib/maintenance';
-import { getSessionByToken, getUserById, isAdmin } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
-                  request.nextUrl.searchParams.get('token');
-
-    if (!token) {
-      return NextResponse.json({ enabled: false });
-    }
-
-    const session = await getSessionByToken(token);
-    if (!session) {
-      return NextResponse.json({ enabled: false });
-    }
-
-    const user = await getUserById(session.userId);
-    if (!isAdmin(user)) {
-      return NextResponse.json({ enabled: false });
-    }
-
+    // Authentification supprimée - accès libre à /admin
     const enabled = await isMaintenanceMode();
     return NextResponse.json({ enabled });
   } catch (error) {
@@ -31,31 +14,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Authentification supprimée - accès libre à /admin
     const body = await request.json();
-    const { token, enabled } = body;
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Token manquant' },
-        { status: 401 }
-      );
-    }
-
-    const session = await getSessionByToken(token);
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Session invalide' },
-        { status: 401 }
-      );
-    }
-
-    const user = await getUserById(session.userId);
-    if (!isAdmin(user)) {
-      return NextResponse.json(
-        { error: 'Accès refusé' },
-        { status: 403 }
-      );
-    }
+    const { enabled } = body;
 
     await setMaintenanceMode(enabled === true);
     return NextResponse.json({ success: true, enabled });

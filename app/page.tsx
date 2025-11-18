@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
-import { Info } from 'lucide-react';
+import { Info, Plus, X } from 'lucide-react';
 
 interface Ville {
   id: number;
@@ -15,18 +15,19 @@ interface Etablissement {
   ville_id: number;
 }
 
+interface Periode {
+  id: number;
+  libelle: string;
+  date_debut: string;
+  date_fin: string;
+  ville_id: number;
+}
+
 interface Controleur {
   id: number;
   nom: string;
   prenom: string;
   ville_id: number;
-}
-
-interface Mission {
-  id: number;
-  nom: string;
-  date_debut: string;
-  date_fin: string;
 }
 
 interface Volet {
@@ -38,6 +39,9 @@ interface Volet {
     id: number;
     numero: number;
     libelle: string;
+    composante_evaluee?: string;
+    criteres_indicateurs?: string;
+    mode_verification?: string;
   }>;
 }
 
@@ -51,21 +55,23 @@ interface RubriqueEvaluation {
   rubriqueId: number;
   note: number | null;
   commentaire: string;
+  showObservations: boolean;
+  showDetails: boolean; // Pour afficher/masquer Critères et Mode de vérification
 }
 
 export default function HomePage() {
   // Données de référence
-  const [missions, setMissions] = useState<Mission[]>([]);
   const [villes, setVilles] = useState<Ville[]>([]);
   const [etablissements, setEtablissements] = useState<Etablissement[]>([]);
+  const [periodes, setPeriodes] = useState<Periode[]>([]);
   const [controleurs, setControleurs] = useState<Controleur[]>([]);
   const [volets, setVolets] = useState<Volet[]>([]);
   const [bareme, setBareme] = useState<BaremeItem[]>([]);
 
-  // Sélections du formulaire
-  const [selectedMission, setSelectedMission] = useState<number | null>(null);
+  // Sélections du formulaire - ordre strict : Ville → Établissement → Période → Contrôleur → Volet
   const [selectedVille, setSelectedVille] = useState<number | null>(null);
   const [selectedEtablissement, setSelectedEtablissement] = useState<number | null>(null);
+  const [selectedPeriode, setSelectedPeriode] = useState<number | null>(null);
   const [selectedControleur, setSelectedControleur] = useState<number | null>(null);
   const [selectedVolet, setSelectedVolet] = useState<number | null>(null);
 
@@ -73,13 +79,33 @@ export default function HomePage() {
   const [evaluations, setEvaluations] = useState<Record<number, RubriqueEvaluation>>({});
   const [showBareme, setShowBareme] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const baremeModalRef = useRef<HTMLDivElement>(null);
+  const detailsRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
-  // Fermer le modal du barème quand on clique en dehors
+  // Vérifier le mode maintenance au chargement
+  useEffect(() => {
+    const checkMaintenance = async () => {
+      try {
+        const response = await fetch('/api/maintenance');
+        const data = await response.json();
+        if (data.enabled) {
+          setMaintenanceMode(true);
+          window.location.href = '/maintenance';
+        }
+      } catch (error) {
+        console.error('Error checking maintenance mode:', error);
+      }
+    };
+    checkMaintenance();
+  }, []);
+
+  // Fermer le modal du barème quand on clique en dehors (sans toast)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (baremeModalRef.current && !baremeModalRef.current.contains(event.target as Node)) {
         setShowBareme(false);
+        // Pas de toast sur fermeture automatique
       }
     };
 
@@ -92,16 +118,41 @@ export default function HomePage() {
     };
   }, [showBareme]);
 
+  // Fermer les détails (critères/mode) au clic ailleurs
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      Object.entries(detailsRefs.current).forEach(([rubriqueId, ref]) => {
+        if (ref && !ref.contains(event.target as Node)) {
+          const id = parseInt(rubriqueId, 10);
+          setEvaluations((prev) => ({
+            ...prev,
+            [id]: {
+              ...prev[id],
+              showDetails: false,
+            },
+          }));
+        }
+      });
+    };
+
+    const hasOpenDetails = Object.values(evaluations).some((e) => e?.showDetails);
+    if (hasOpenDetails) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [evaluations]);
+
   useEffect(() => {
     // Charger les données de référence
     Promise.all([
-      fetch('/api/missions').then((r) => r.json()),
       fetch('/api/villes').then((r) => r.json()),
       fetch('/api/volets').then((r) => r.json()),
       fetch('/api/bareme').then((r) => r.json()),
     ])
-      .then(([missionsData, villesData, voletsData, baremeData]) => {
-        setMissions(missionsData.missions || []);
+      .then(([villesData, voletsData, baremeData]) => {
         setVilles(villesData.villes || []);
         setVolets(voletsData.volets || []);
         setBareme(baremeData.bareme || []);
@@ -112,15 +163,18 @@ export default function HomePage() {
       });
   }, []);
 
+  // Charger les établissements et contrôleurs quand la ville change
   useEffect(() => {
     if (selectedVille) {
       Promise.all([
         fetch(`/api/etablissements?villeId=${selectedVille}`).then((r) => r.json()),
         fetch(`/api/controleurs?villeId=${selectedVille}`).then((r) => r.json()),
+        fetch(`/api/periodes?villeId=${selectedVille}`).then((r) => r.json()),
       ])
-        .then(([etabData, controleursData]) => {
+        .then(([etabData, controleursData, periodesData]) => {
           setEtablissements(etabData.etablissements || []);
           setControleurs(controleursData.controleurs || []);
+          setPeriodes(periodesData.periodes || []);
         })
         .catch(() => {
           toast.error('Erreur lors du chargement des données');
@@ -128,11 +182,47 @@ export default function HomePage() {
     } else {
       setEtablissements([]);
       setControleurs([]);
+      setPeriodes([]);
       setSelectedEtablissement(null);
+      setSelectedPeriode(null);
       setSelectedControleur(null);
     }
   }, [selectedVille]);
 
+  // Réinitialiser les sélections dépendantes quand la ville change
+  useEffect(() => {
+    if (!selectedVille) {
+      setSelectedEtablissement(null);
+      setSelectedPeriode(null);
+      setSelectedControleur(null);
+      setSelectedVolet(null);
+    }
+  }, [selectedVille]);
+
+  // Réinitialiser la période et le contrôleur quand l'établissement change
+  useEffect(() => {
+    if (!selectedEtablissement) {
+      setSelectedPeriode(null);
+      setSelectedControleur(null);
+      setSelectedVolet(null);
+    }
+  }, [selectedEtablissement]);
+
+  // Réinitialiser le volet quand la période change
+  useEffect(() => {
+    if (!selectedPeriode) {
+      setSelectedVolet(null);
+    }
+  }, [selectedPeriode]);
+
+  // Réinitialiser le volet quand le contrôleur change
+  useEffect(() => {
+    if (!selectedControleur) {
+      setSelectedVolet(null);
+    }
+  }, [selectedControleur]);
+
+  // Initialiser les évaluations quand le volet change
   useEffect(() => {
     if (selectedVolet) {
       const volet = volets.find((v) => v.id === selectedVolet);
@@ -143,6 +233,8 @@ export default function HomePage() {
             rubriqueId: rubrique.id,
             note: null,
             commentaire: '',
+            showObservations: false,
+            showDetails: false,
           };
         });
         setEvaluations(initialEvaluations);
@@ -166,10 +258,37 @@ export default function HomePage() {
     }));
   };
 
+  const toggleObservations = (rubriqueId: number) => {
+    setEvaluations((prev) => ({
+      ...prev,
+      [rubriqueId]: {
+        ...prev[rubriqueId],
+        showObservations: !prev[rubriqueId]?.showObservations,
+      },
+    }));
+  };
+
+  const toggleDetails = (rubriqueId: number) => {
+    setEvaluations((prev) => ({
+      ...prev,
+      [rubriqueId]: {
+        ...prev[rubriqueId],
+        rubriqueId,
+        showDetails: !prev[rubriqueId]?.showDetails,
+      },
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedMission || !selectedVille || !selectedEtablissement || !selectedControleur || !selectedVolet) {
+    if (
+      !selectedVille ||
+      !selectedEtablissement ||
+      !selectedPeriode ||
+      !selectedControleur ||
+      !selectedVolet
+    ) {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
@@ -181,14 +300,34 @@ export default function HomePage() {
       return;
     }
 
+    // Trouver la mission correspondante à la période
+    const periode = periodes.find((p) => p.id === selectedPeriode);
+    if (!periode) {
+      toast.error('Période invalide');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      // Récupérer ou créer la mission correspondante
+      const missionResponse = await fetch('/api/missions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nom: `Mission ${villes.find((v) => v.id === selectedVille)?.nom || ''}`,
+          date_debut: periode.date_debut,
+          date_fin: periode.date_fin,
+        }),
+      });
+      const missionData = await missionResponse.json();
+      const missionId = missionData.mission?.id || missionData.id;
+
       const response = await fetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          missionId: selectedMission,
+          missionId: missionId,
           villeId: selectedVille,
           etablissementVisiteId: selectedEtablissement,
           controleurId: selectedControleur,
@@ -204,11 +343,11 @@ export default function HomePage() {
       const data = await response.json();
 
       if (response.ok) {
-        toast.success('Évaluation enregistrée avec succès!');
+        toast.success('Évaluation enregistrée avec succès.');
         // Réinitialiser le formulaire
-        setSelectedMission(null);
         setSelectedVille(null);
         setSelectedEtablissement(null);
+        setSelectedPeriode(null);
         setSelectedControleur(null);
         setSelectedVolet(null);
         setEvaluations({});
@@ -222,6 +361,23 @@ export default function HomePage() {
     }
   };
 
+  const handleCancel = () => {
+    if (confirm('Êtes-vous sûr de vouloir annuler ?')) {
+      setSelectedVille(null);
+      setSelectedEtablissement(null);
+      setSelectedPeriode(null);
+      setSelectedControleur(null);
+      setSelectedVolet(null);
+      setEvaluations({});
+      toast.error('Évaluation annulée.');
+    }
+  };
+
+  const handleCloseBareme = () => {
+    setShowBareme(false);
+    toast.error('Fenêtre fermée.');
+  };
+
   const activeVolet = volets.find((v) => v.id === selectedVolet);
 
   return (
@@ -231,37 +387,12 @@ export default function HomePage() {
       </h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Sélections de base */}
+        {/* Sélections guidées dans l'ordre strict */}
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body p-4 sm:p-6">
             <h2 className="card-title mb-4">Informations de base</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Mission / Période *</span>
-                </label>
-                <select
-                  className="select select-bordered"
-                  value={selectedMission || ''}
-                  onChange={(e) => {
-                    const missionId = e.target.value ? parseInt(e.target.value, 10) : null;
-                    setSelectedMission(missionId);
-                    if (missionId) {
-                      const mission = missions.find((m) => m.id === missionId);
-                      toast.success(`Mission sélectionnée : ${mission?.nom || ''}`);
-                    }
-                  }}
-                  required
-                >
-                  <option value="">Sélectionner une mission</option>
-                  {missions.map((mission) => (
-                    <option key={mission.id} value={mission.id}>
-                      {mission.nom} ({mission.date_debut} - {mission.date_fin})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
+              {/* 1. Ville */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text">Ville *</span>
@@ -272,12 +403,6 @@ export default function HomePage() {
                   onChange={(e) => {
                     const villeId = e.target.value ? parseInt(e.target.value, 10) : null;
                     setSelectedVille(villeId);
-                    setSelectedEtablissement(null);
-                    setSelectedControleur(null);
-                    if (villeId) {
-                      const ville = villes.find((v) => v.id === villeId);
-                      toast.success(`Ville sélectionnée : ${ville?.nom || ''}`);
-                    }
                   }}
                   required
                 >
@@ -290,6 +415,7 @@ export default function HomePage() {
                 </select>
               </div>
 
+              {/* 2. Établissement visité */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text">Établissement visité *</span>
@@ -300,10 +426,6 @@ export default function HomePage() {
                   onChange={(e) => {
                     const etabId = e.target.value ? parseInt(e.target.value, 10) : null;
                     setSelectedEtablissement(etabId);
-                    if (etabId) {
-                      const etab = etablissements.find((e) => e.id === etabId);
-                      toast.success(`Établissement sélectionné : ${etab?.nom || ''}`);
-                    }
                   }}
                   required
                   disabled={!selectedVille}
@@ -317,6 +439,31 @@ export default function HomePage() {
                 </select>
               </div>
 
+              {/* 3. Période */}
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Période *</span>
+                </label>
+                <select
+                  className="select select-bordered"
+                  value={selectedPeriode || ''}
+                  onChange={(e) => {
+                    const periodeId = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setSelectedPeriode(periodeId);
+                  }}
+                  required
+                  disabled={!selectedVille || !selectedEtablissement}
+                >
+                  <option value="">Sélectionner une période</option>
+                  {periodes.map((periode) => (
+                    <option key={periode.id} value={periode.id}>
+                      {periode.libelle}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 4. Contrôleur */}
               <div className="form-control">
                 <label className="label">
                   <span className="label-text">Contrôleur *</span>
@@ -327,10 +474,6 @@ export default function HomePage() {
                   onChange={(e) => {
                     const controleurId = e.target.value ? parseInt(e.target.value, 10) : null;
                     setSelectedControleur(controleurId);
-                    if (controleurId) {
-                      const controleur = controleurs.find((c) => c.id === controleurId);
-                      toast.success(`Contrôleur sélectionné : ${controleur?.nom || ''} ${controleur?.prenom || ''}`);
-                    }
                   }}
                   required
                   disabled={!selectedVille}
@@ -344,7 +487,8 @@ export default function HomePage() {
                 </select>
               </div>
 
-              <div className="form-control">
+              {/* 5. Volet */}
+              <div className="form-control md:col-span-2">
                 <label className="label">
                   <span className="label-text">Volet *</span>
                 </label>
@@ -354,12 +498,9 @@ export default function HomePage() {
                   onChange={(e) => {
                     const voletId = e.target.value ? parseInt(e.target.value, 10) : null;
                     setSelectedVolet(voletId);
-                    if (voletId) {
-                      const volet = volets.find((v) => v.id === voletId);
-                      toast.success(`Volet sélectionné : ${volet?.libelle || ''}`);
-                    }
                   }}
                   required
+                  disabled={!selectedVille || !selectedEtablissement || !selectedPeriode || !selectedControleur}
                 >
                   <option value="">Sélectionner un volet</option>
                   {volets.map((volet) => (
@@ -382,13 +523,10 @@ export default function HomePage() {
                 <button
                   type="button"
                   className="btn btn-sm btn-outline"
-                  onClick={() => {
-                    setShowBareme(true);
-                    toast.info('Barème affiché');
-                  }}
+                  onClick={() => setShowBareme(true)}
                 >
                   <Info size={16} className="mr-2" />
-                  Barème
+                  Afficher le barème
                 </button>
               </div>
 
@@ -412,11 +550,8 @@ export default function HomePage() {
                     <div className="modal-action">
                       <button
                         type="button"
-                        className="btn"
-                        onClick={() => {
-                          setShowBareme(false);
-                          toast.info('Barème fermé');
-                        }}
+                        className="btn btn-error"
+                        onClick={handleCloseBareme}
                       >
                         Fermer
                       </button>
@@ -431,51 +566,132 @@ export default function HomePage() {
                     rubriqueId: rubrique.id,
                     note: null,
                     commentaire: '',
+                    showObservations: false,
+                    showDetails: false,
                   };
                   return (
                     <div key={rubrique.id} className="border rounded-lg p-4">
+                      {/* Afficher directement la composante évaluée comme titre avec le numéro */}
                       <div className="mb-3">
-                        <span className="font-semibold">Rubrique {rubrique.numero}:</span>{' '}
-                        {rubrique.libelle}
+                        <span className="font-semibold text-lg">
+                          {rubrique.composante_evaluee 
+                            ? (rubrique.composante_evaluee.match(/^\d+[–-]/) 
+                                ? rubrique.composante_evaluee.replace(/^(\d+)[–-]/, `${rubrique.numero}-`)
+                                : `${rubrique.numero}- ${rubrique.composante_evaluee}`)
+                            : `${rubrique.numero}- ${rubrique.libelle}`
+                          }
+                        </span>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="form-control">
-                          <label className="label">
-                            <span className="label-text">Note (1-5) *</span>
-                          </label>
-                          <select
-                            className="select select-bordered"
-                            value={evaluation.note || ''}
-                            onChange={(e) => {
-                              const note = parseInt(e.target.value, 10);
-                              updateRubriqueNote(rubrique.id, note);
-                              toast.success(`Note ${note} sélectionnée`);
-                            }}
-                            required
-                          >
-                            <option value="">Sélectionner une note</option>
-                            {[1, 2, 3, 4, 5].map((note) => (
-                              <option key={note} value={note}>
-                                {note}
-                              </option>
-                            ))}
-                          </select>
+
+                      {/* Bouton pour afficher les détails (Critères et Mode de vérification) */}
+                      {!evaluation.showDetails && (rubrique.criteres_indicateurs || rubrique.mode_verification) && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline mb-4"
+                          onClick={() => toggleDetails(rubrique.id)}
+                        >
+                          <Info size={16} className="mr-2" />
+                          Afficher les détails (Critères / Mode de vérification)
+                        </button>
+                      )}
+
+                      {/* Colonnes Critères et Mode de vérification - affichage conditionnel */}
+                      {evaluation.showDetails && (rubrique.criteres_indicateurs || rubrique.mode_verification) && (
+                        <div
+                          ref={(el) => {
+                            detailsRefs.current[rubrique.id] = el;
+                          }}
+                          className="mb-4 border-2 border-primary/20 rounded-lg p-4 md:p-6 bg-base-100 shadow-sm"
+                        >
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-4">
+                            {rubrique.criteres_indicateurs && (
+                              <div className="space-y-2">
+                                <h4 className="font-bold text-base text-primary">Critères / Indicateurs:</h4>
+                                <p className="text-base leading-relaxed whitespace-pre-wrap">
+                                  {rubrique.criteres_indicateurs}
+                                </p>
+                              </div>
+                            )}
+                            {rubrique.mode_verification && (
+                              <div className="space-y-2">
+                                <h4 className="font-bold text-base text-primary">Mode de vérification:</h4>
+                                <p className="text-base leading-relaxed whitespace-pre-wrap">
+                                  {rubrique.mode_verification}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex justify-end pt-2 border-t border-base-300">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => toggleDetails(rubrique.id)}
+                            >
+                              <X size={16} className="mr-2" />
+                              Masquer les détails
+                            </button>
+                          </div>
                         </div>
+                      )}
+
+                      {/* Note */}
+                      <div className="form-control mb-3">
+                        <label className="label">
+                          <span className="label-text">Note (1-5) *</span>
+                        </label>
+                        <div className="flex gap-2 flex-wrap">
+                          {[1, 2, 3, 4, 5].map((note) => (
+                            <button
+                              key={note}
+                              type="button"
+                              className={`btn btn-sm ${
+                                evaluation.note === note
+                                  ? 'btn-primary'
+                                  : 'btn-outline'
+                              }`}
+                              onClick={() => updateRubriqueNote(rubrique.id, note)}
+                            >
+                              {note}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Observations conditionnelles */}
+                      {!evaluation.showObservations ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => toggleObservations(rubrique.id)}
+                        >
+                          <Plus size={16} className="mr-2" />
+                          Ajouter une observation / recommandation
+                        </button>
+                      ) : (
                         <div className="form-control">
-                          <label className="label">
-                            <span className="label-text">Commentaire (optionnel)</span>
-                          </label>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="label">
+                              <span className="label-text">Observations / Recommandations</span>
+                            </label>
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-ghost"
+                              onClick={() => toggleObservations(rubrique.id)}
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
                           <textarea
                             className="textarea textarea-bordered"
-                            rows={2}
+                            rows={3}
                             value={evaluation.commentaire || ''}
                             onChange={(e) =>
                               updateRubriqueCommentaire(rubrique.id, e.target.value)
                             }
-                            placeholder="Saisir vos observations..."
+                            placeholder="Saisir vos observations ou recommandations..."
                           />
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
@@ -489,19 +705,7 @@ export default function HomePage() {
           <button
             type="button"
             className="btn btn-error flex-1"
-            onClick={() => {
-              if (confirm('Êtes-vous sûr de vouloir annuler ?')) {
-                setSelectedMission(null);
-                setSelectedVille(null);
-                setSelectedEtablissement(null);
-                setSelectedControleur(null);
-                setSelectedVolet(null);
-                setEvaluations({});
-                toast.info('Formulaire annulé');
-              } else {
-                toast.info('Annulation annulée');
-              }
-            }}
+            onClick={handleCancel}
             disabled={isSubmitting}
           >
             Annuler
@@ -510,13 +714,8 @@ export default function HomePage() {
             type="submit"
             className="btn btn-primary flex-1"
             disabled={isSubmitting}
-            onClick={() => {
-              if (!selectedMission || !selectedVille || !selectedEtablissement || !selectedControleur || !selectedVolet) {
-                toast.warning('Veuillez remplir tous les champs obligatoires');
-              }
-            }}
           >
-            {isSubmitting ? 'Enregistrement...' : 'Enregistrer l\'évaluation'}
+            {isSubmitting ? 'Enregistrement...' : 'Valider'}
           </button>
         </div>
       </form>

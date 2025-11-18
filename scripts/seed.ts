@@ -1,4 +1,5 @@
 import { getPool, closePool } from '../lib/db';
+import { hashPassword } from '../lib/auth';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -159,6 +160,32 @@ async function seed() {
         );
       }
       console.log('✓ Rubriques F_GAB créées');
+    }
+
+    // Créer l'utilisateur admin par défaut
+    const adminEmail = 'sergeobusiness1@gmail.com';
+    const adminPassword = 'Pass_w0rd';
+    const passwordHash = await hashPassword(adminPassword);
+    
+    try {
+      await pool.query(
+        `INSERT INTO users (email, password_hash, nom, prenom, role, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (email) DO UPDATE SET
+           password_hash = EXCLUDED.password_hash,
+           role = EXCLUDED.role,
+           is_active = EXCLUDED.is_active,
+           updated_at = NOW()`,
+        [adminEmail.toLowerCase(), passwordHash, 'Admin', 'Système', 'admin', true]
+      );
+      console.log('✓ Utilisateur admin créé/mis à jour');
+    } catch (error: any) {
+      // Si la table n'existe pas encore, on ignore l'erreur
+      if (error.code === '42P01') {
+        console.log('⚠️  Table users non trouvée, création de l\'utilisateur ignorée (exécutez d\'abord les migrations)');
+      } else {
+        throw error;
+      }
     }
 
     console.log('Seed terminé avec succès!');

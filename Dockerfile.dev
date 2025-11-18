@@ -14,8 +14,15 @@ RUN npm ci
 # Copier le reste des fichiers
 COPY . .
 
-# Rendre le script d'entrypoint exécutable
-RUN chmod +x scripts/docker-entrypoint.sh
+# Convertir les fins de ligne du script en Unix (LF) et le rendre exécutable
+RUN sed -i 's/\r$//' scripts/docker-entrypoint.sh && \
+    chmod +x scripts/docker-entrypoint.sh
+
+# Créer un script wrapper qui convertit les fins de ligne avant d'exécuter le script
+RUN echo '#!/bin/sh' > /entrypoint-wrapper.sh && \
+    echo 'sed -i "s/\\r$//" /app/scripts/docker-entrypoint.sh 2>/dev/null || true' >> /entrypoint-wrapper.sh && \
+    echo 'exec /app/scripts/docker-entrypoint.sh "$@"' >> /entrypoint-wrapper.sh && \
+    chmod +x /entrypoint-wrapper.sh
 
 # Exposer le port
 EXPOSE 3000

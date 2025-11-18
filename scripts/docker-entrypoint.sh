@@ -1,26 +1,30 @@
 #!/bin/sh
-set -e
 
-echo "⏳ Attente de la base de données..."
-# Attendre que PostgreSQL soit prêt
-# Utiliser les variables d'environnement du docker-compose
-until pg_isready -h db -U mission_banque_user -d mission_banque_db > /dev/null 2>&1; do
-  echo "⏳ En attente de PostgreSQL..."
+echo "â³ Attente de la base de donnÃ©es..."
+# Attendre que PostgreSQL soit prÃªt
+# D'abord vÃ©rifier que le serveur PostgreSQL rÃ©pond
+until pg_isready -h db -U mission_banque_user > /dev/null 2>&1; do
+  echo "â³ En attente de PostgreSQL..."
   sleep 2
 done
 
-echo "✅ Base de données prête!"
+# Ensuite vÃ©rifier que la base de donnÃ©es existe et est accessible
+until pg_isready -h db -U mission_banque_user -d mission_banque_db > /dev/null 2>&1; do
+  echo "â³ En attente que la base de donnÃ©es soit prÃªte..."
+  sleep 2
+done
 
-# Exécuter les migrations
-echo "🔄 Exécution des migrations..."
-npm run migrate || echo "⚠️  Migrations déjà exécutées ou erreur (non bloquant)"
+echo "âœ… Base de donnÃ©es prÃªte!"
 
-# Exécuter le seed
-echo "🌱 Exécution du seed..."
-npm run seed || echo "⚠️  Seed déjà exécuté ou erreur (non bloquant)"
+# ExÃ©cuter les migrations
+echo "ðŸ”„ ExÃ©cution des migrations..."
+npm run migrate || echo "âš ï¸  Migrations dÃ©jÃ  exÃ©cutÃ©es ou erreur (non bloquant)"
 
-echo "✅ Initialisation terminée!"
+# ExÃ©cuter le seed
+echo "ðŸŒ± ExÃ©cution du seed..."
+npm run seed || echo "âš ï¸  Seed dÃ©jÃ  exÃ©cutÃ© ou erreur (non bloquant)"
 
-# Exécuter la commande passée en paramètre (généralement npm install && npm run dev)
+echo "âœ… Initialisation terminÃ©e!"
+
+# ExÃ©cuter la commande passÃ©e en paramÃ¨tre (gÃ©nÃ©ralement npm install && npm run dev)
 exec "$@"
-

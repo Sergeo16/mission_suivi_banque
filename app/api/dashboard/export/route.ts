@@ -1,42 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
-import { getSessionByToken, getUserById } from '@/lib/auth';
 import * as XLSX from 'xlsx';
+
+// Fonction pour obtenir l'appréciation à partir de la moyenne
+function getAppreciation(moyenne: number, bareme: Array<{ note: number; libelle: string }>): string {
+  const noteArrondie = Math.round(moyenne);
+  const baremeItem = bareme.find((b) => b.note === noteArrondie);
+  return baremeItem ? baremeItem.libelle : '';
+}
+
+// Fonction pour générer le nom de feuille Excel (max 31 caractères)
+function generateSheetName(prefix: string, villeNom: string, etablissementNom: string): string {
+  const villePrefix = villeNom.substring(0, 4).toUpperCase();
+  // Tronquer l'établissement si nécessaire pour respecter la limite de 31 caractères
+  const maxEtabLength = 31 - prefix.length - villePrefix.length - 1; // -1 pour le underscore
+  const etabTruncated = etablissementNom.length > maxEtabLength
+    ? etablissementNom.substring(0, maxEtabLength)
+    : etablissementNom;
+  return `${prefix}${villePrefix}_${etabTruncated}`;
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
-                  request.cookies.get('session_token')?.value;
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Non authentifié' },
-        { status: 401 }
-      );
-    }
-
-    const session = await getSessionByToken(token);
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Session invalide' },
-        { status: 401 }
-      );
-    }
-
-    const user = await getUserById(session.userId);
-    if (!user || !user.isActive) {
-      return NextResponse.json(
-        { error: 'Utilisateur invalide' },
-        { status: 401 }
-      );
-    }
-
-    if (user.role !== 'admin' && user.role !== 'superviseur') {
-      return NextResponse.json(
-        { error: 'Accès refusé' },
-        { status: 403 }
-      );
-    }
+    // Authentification supprimée - accès libre à /admin
 
     const missionId = request.nextUrl.searchParams.get('missionId');
     const villeId = request.nextUrl.searchParams.get('villeId');
@@ -46,8 +32,14 @@ export async function GET(request: NextRequest) {
 
     const pool = getPool();
 
+    // Récupérer le barème
+    const baremeResult = await pool.query(
+      'SELECT note, libelle FROM bareme ORDER BY note'
+    );
+    const bareme = baremeResult.rows;
+
     // Construire les conditions WHERE
-    let whereConditions = ['1=1'];
+    const whereConditions: string[] = [];
     const params: any[] = [];
     let paramIndex = 1;
 
@@ -72,7 +64,9 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
-    const whereClause = whereConditions.join(' AND ');
+    const whereClause = whereConditions.length > 0 
+      ? whereConditions.join(' AND ')
+      : '1=1';
 
     // Récupérer les volets
     const voletsResult = await pool.query(
@@ -86,6 +80,16 @@ export async function GET(request: NextRequest) {
     const workbook = XLSX.utils.book_new();
 
     for (const volet of volets) {
+      // Déterminer le préfixe selon le volet
+      let prefix = '';
+      if (volet.code === 'FI') {
+        prefix = 'Moy_FI_';
+      } else if (volet.code === 'F_QS') {
+        prefix = 'Moy_QS_';
+      } else if (volet.code === 'F_GAB') {
+        prefix = 'Moy_GAB_';
+      }
+
       // Récupérer les rubriques du volet
       const rubriquesResult = await pool.query(
         'SELECT id, numero, libelle FROM rubrique WHERE volet_id = $1 ORDER BY numero',
@@ -94,80 +98,160 @@ export async function GET(request: NextRequest) {
       const rubriques = rubriquesResult.rows;
 
       // Requête pour les moyennes par Ville et Établissement pour ce volet
+      // On groupe par rubrique pour calculer la moyenne de chaque rubrique
       const voletParamIndex = params.length + 1;
-      const query = `
+      const finalParams = [...params, volet.id];
+      
+      // D'abord, récupérer toutes les évaluations pour ce volet
+      const evaluationsQuery = `
         SELECT 
+          v.id as ville_id,
           v.nom as ville_nom,
+          et.id as etablissement_id,
           et.nom as etablissement_nom,
-          m.nom as mission_nom,
-          m.date_debut,
-          m.date_fin,
-          c.nom as controleur_nom,
-          c.prenom as controleur_prenom,
-          ${rubriques
-            .map(
-              (r, idx) =>
-                `ROUND(AVG(CASE WHEN er.rubrique_id = ${r.id} THEN er.note END)::numeric, 2) as rubrique_${r.numero}`
-            )
-            .join(',\n          ')}
-          ROUND(AVG(er.note)::numeric, 2) as moyenne_globale,
-          COUNT(DISTINCT e.id) as nombre_evaluations
+          e.rubrique_id,
+          e.note
         FROM evaluation e
-        JOIN evaluation_rubrique er ON e.id = er.evaluation_id
         JOIN ville v ON e.ville_id = v.id
         JOIN etablissement_visite et ON e.etablissement_visite_id = et.id
-        JOIN mission m ON e.mission_id = m.id
-        JOIN controleur c ON e.controleur_id = c.id
-        WHERE ${whereClause} AND er.volet_id = $${voletParamIndex}
-        GROUP BY v.id, v.nom, et.id, et.nom, m.id, m.nom, m.date_debut, m.date_fin, c.id, c.nom, c.prenom
-        ORDER BY v.nom, et.nom
+        WHERE ${whereClause} AND e.volet_id = $${voletParamIndex}
       `;
-
-      const finalParams = [...params, volet.id];
-      const result = await pool.query(query, finalParams);
-
-      // Préparer les données pour Excel
-      const excelData = result.rows.map((row) => {
-        const rowData: any = {
-          Mission: row.mission_nom,
-          'Date début': row.date_debut,
-          'Date fin': row.date_fin,
-          Ville: row.ville_nom,
-          'Établissement': row.etablissement_nom,
-          'Contrôleur': `${row.controleur_nom} ${row.controleur_prenom}`,
+      
+      const evaluationsResult = await pool.query(evaluationsQuery, finalParams);
+      
+      // Grouper par (ville_id, etablissement_id) et calculer les moyennes
+      const groupedEvaluations: Record<string, {
+        ville_id: number;
+        ville_nom: string;
+        etablissement_id: number;
+        etablissement_nom: string;
+        rubriques: Record<number, number[]>;
+      }> = {};
+      
+      evaluationsResult.rows.forEach((row) => {
+        const key = `${row.ville_id}_${row.etablissement_id}`;
+        if (!groupedEvaluations[key]) {
+          groupedEvaluations[key] = {
+            ville_id: row.ville_id,
+            ville_nom: row.ville_nom,
+            etablissement_id: row.etablissement_id,
+            etablissement_nom: row.etablissement_nom,
+            rubriques: {},
+          };
+        }
+        if (!groupedEvaluations[key].rubriques[row.rubrique_id]) {
+          groupedEvaluations[key].rubriques[row.rubrique_id] = [];
+        }
+        groupedEvaluations[key].rubriques[row.rubrique_id].push(row.note);
+      });
+      
+      // Convertir en format pour Excel
+      const result = Object.values(groupedEvaluations).map((group) => {
+        const row: any = {
+          ville_id: group.ville_id,
+          ville_nom: group.ville_nom,
+          etablissement_id: group.etablissement_id,
+          etablissement_nom: group.etablissement_nom,
         };
-
-        // Ajouter les colonnes pour chaque rubrique
+        
+        // Calculer la moyenne pour chaque rubrique
+        const allNotes: number[] = [];
         rubriques.forEach((rubrique) => {
-          const colName = `Rubrique ${rubrique.numero}`;
-          rowData[colName] = row[`rubrique_${rubrique.numero}`] || '';
+          const notes = group.rubriques[rubrique.id] || [];
+          const moyenne = notes.length > 0
+            ? notes.reduce((sum, n) => sum + n, 0) / notes.length
+            : null;
+          row[`rubrique_${rubrique.numero}`] = moyenne;
+          if (moyenne !== null) {
+            allNotes.push(...notes);
+          }
         });
-
-        rowData['Moyenne globale'] = parseFloat(row.moyenne_globale) || 0;
-        rowData['Nombre d\'évaluations'] = parseInt(row.nombre_evaluations, 10);
-
-        return rowData;
+        
+        // Moyenne globale
+        row.moyenne_5 = allNotes.length > 0
+          ? allNotes.reduce((sum, n) => sum + n, 0) / allNotes.length
+          : 0;
+        
+        return row;
       });
 
-      // Créer une feuille Excel
-      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      // Grouper par combinaison (Ville, Établissement) et créer une feuille par combinaison
+      const groupedData: Record<string, any[]> = {};
+      result.forEach((row) => {
+        const key = `${row.ville_id}_${row.etablissement_id}`;
+        if (!groupedData[key]) {
+          groupedData[key] = [];
+        }
+        groupedData[key].push(row);
+      });
 
-      // Ajuster la largeur des colonnes
-      const colWidths = [
-        { wch: 20 }, // Mission
-        { wch: 12 }, // Date début
-        { wch: 12 }, // Date fin
-        { wch: 20 }, // Ville
-        { wch: 25 }, // Établissement
-        { wch: 25 }, // Contrôleur
-        ...rubriques.map(() => ({ wch: 15 })), // Rubriques
-        { wch: 15 }, // Moyenne globale
-        { wch: 20 }, // Nombre d'évaluations
-      ];
-      worksheet['!cols'] = colWidths;
+      // Créer une feuille pour chaque combinaison (Ville, Établissement)
+      for (const [key, rows] of Object.entries(groupedData)) {
+        if (rows.length === 0) continue;
 
-      // Ajouter la feuille au classeur avec le nom du volet
-      XLSX.utils.book_append_sheet(workbook, worksheet, volet.code);
+        const firstRow = rows[0];
+        const sheetName = generateSheetName(prefix, firstRow.ville_nom, firstRow.etablissement_nom);
+
+        // Préparer les données en format array of arrays pour Excel
+        const excelRows: any[][] = [];
+
+        // En-tête avec Volet, Ville, Établissement
+        excelRows.push(['Volet:', volet.libelle]);
+        excelRows.push(['Ville:', firstRow.ville_nom]);
+        excelRows.push(['Établissement visité:', firstRow.etablissement_nom]);
+        excelRows.push([]); // Ligne vide
+
+        // En-têtes des colonnes
+        const headerRow: any[] = [];
+        rubriques.forEach((rubrique) => {
+          headerRow.push(`Rubrique ${rubrique.numero}`);
+        });
+        headerRow.push('Moyenne / 5');
+        headerRow.push('Observations');
+        excelRows.push(headerRow);
+
+        // Données - une ligne avec toutes les moyennes des rubriques
+        const dataRow: any[] = [];
+        
+        // Ajouter les moyennes par rubrique
+        rubriques.forEach((rubrique) => {
+          const moyenneRubrique = rows[0]?.[`rubrique_${rubrique.numero}`];
+          dataRow.push(moyenneRubrique !== null && moyenneRubrique !== undefined
+            ? parseFloat(moyenneRubrique.toString()).toFixed(2)
+            : '');
+        });
+
+        // Moyenne globale
+        const moyenneGlobale = parseFloat(rows[0]?.moyenne_5) || 0;
+        dataRow.push(moyenneGlobale.toFixed(2));
+
+        // Observations basées sur le barème
+        dataRow.push(getAppreciation(moyenneGlobale, bareme));
+
+        excelRows.push(dataRow);
+
+        // Créer la feuille Excel
+        const worksheet = XLSX.utils.aoa_to_sheet(excelRows);
+
+        // Ajuster la largeur des colonnes
+        // Structure: 2 colonnes pour les en-têtes (label + valeur), puis les rubriques + moyenne + observations
+        const numDataCols = rubriques.length + 2; // Rubriques + Moyenne / 5 + Observations
+        const maxCols = Math.max(2, numDataCols);
+        const colWidths: any[] = [];
+        for (let i = 0; i < maxCols; i++) {
+          if (i === 0) {
+            colWidths.push({ wch: 25 }); // Colonne des labels
+          } else if (i === 1) {
+            colWidths.push({ wch: 40 }); // Colonne des valeurs pour les en-têtes
+          } else {
+            colWidths.push({ wch: 15 }); // Colonnes des rubriques, moyenne, observations
+          }
+        }
+        worksheet['!cols'] = colWidths;
+
+        // Ajouter la feuille au classeur
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      }
     }
 
     // Générer le buffer Excel
@@ -188,4 +272,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

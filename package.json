@@ -9,6 +9,7 @@
     "lint": "next lint",
     "migrate": "npx tsx scripts/migrate.ts",
     "seed": "npx tsx scripts/seed.ts",
+    "update-rubriques": "npx tsx scripts/update-rubriques-from-excel.ts",
     "docker:dev": "docker-compose -f docker-compose.dev.yml up",
     "docker:dev:build": "docker-compose -f docker-compose.dev.yml up --build",
     "docker:prod": "docker-compose up",

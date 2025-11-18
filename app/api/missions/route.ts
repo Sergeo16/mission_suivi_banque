@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { nom, dateDebut, dateFin } = body;
+    const { nom, date_debut, date_fin } = body;
 
     if (!nom || typeof nom !== 'string' || nom.trim().length === 0) {
       return NextResponse.json(
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!dateDebut || !dateFin) {
+    if (!date_debut || !date_fin) {
       return NextResponse.json(
         { error: 'Les dates de début et de fin sont requises' },
         { status: 400 }
@@ -38,14 +38,24 @@ export async function POST(request: NextRequest) {
     }
 
     const pool = getPool();
+    // Vérifier si la mission existe déjà
+    const existing = await pool.query(
+      'SELECT id FROM mission WHERE nom = $1 AND date_debut = $2 AND date_fin = $3',
+      [nom.trim(), date_debut, date_fin]
+    );
+
+    if (existing.rows.length > 0) {
+      return NextResponse.json({ mission: existing.rows[0], id: existing.rows[0].id });
+    }
+
     const result = await pool.query(
       `INSERT INTO mission (nom, date_debut, date_fin)
        VALUES ($1, $2, $3)
        RETURNING id, nom, date_debut, date_fin`,
-      [nom.trim(), dateDebut, dateFin]
+      [nom.trim(), date_debut, date_fin]
     );
 
-    return NextResponse.json({ mission: result.rows[0] });
+    return NextResponse.json({ mission: result.rows[0], id: result.rows[0].id });
   } catch (error: any) {
     if (error.code === '23514') {
       return NextResponse.json(

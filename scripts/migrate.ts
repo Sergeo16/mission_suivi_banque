@@ -45,11 +45,31 @@ async function migrate() {
       throw error;
     }
 
-    // Lire le fichier SQL
-    const sqlFile = readFileSync(
-      join(__dirname, '../migrations/001_initial_schema.sql'),
-      'utf-8'
-    );
+    // Lire les fichiers SQL de migration dans l'ordre
+    const migrationFiles = [
+      '001_initial_schema.sql',
+      '002_add_rubrique_columns_and_periodes.sql',
+      '003_create_users_table.sql',
+      '004_create_app_settings_table.sql',
+    ];
+    
+    let allSqlContent = '';
+    for (const migrationFile of migrationFiles) {
+      const migrationPath = join(__dirname, '../migrations', migrationFile);
+      try {
+        const sqlFile = readFileSync(migrationPath, 'utf-8');
+        allSqlContent += '\n' + sqlFile;
+        console.log(`✓ Fichier de migration chargé: ${migrationFile}`);
+      } catch (error: any) {
+        if (error.code === 'ENOENT') {
+          console.log(`⚠️  Fichier de migration non trouvé: ${migrationFile} (ignoré)`);
+        } else {
+          throw error;
+        }
+      }
+    }
+    
+    const sqlFile = allSqlContent;
 
     // Exécuter les commandes SQL une par une
     // On divise par les points-virgules mais on doit être plus intelligent

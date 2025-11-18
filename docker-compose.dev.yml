@@ -37,7 +37,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    entrypoint: ["/bin/sh", "scripts/docker-entrypoint.sh"]
+    entrypoint: ["/entrypoint-wrapper.sh"]
     command: sh -c "npm install && npx next dev -H 0.0.0.0"
 
 volumes:
