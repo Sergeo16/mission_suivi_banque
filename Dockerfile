@@ -53,6 +53,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./next.config.js
 # Ces packages sont nécessaires pour les scripts de migration et seed
 RUN npm install dotenv pg --save --prefix /app
 
+# Rendre le script railway-entrypoint.sh exécutable
+RUN chmod +x scripts/railway-entrypoint.sh
+
 USER nextjs
 
 EXPOSE 3000
@@ -64,5 +67,6 @@ ENV HOSTNAME "0.0.0.0"
 
 # Avec Next.js standalone, server.js est à la racine après copie
 # Next.js standalone devrait automatiquement utiliser PORT et HOSTNAME
-CMD ["node", "server.js"]
+# Utiliser le script d'entrée Railway pour exécuter les migrations au démarrage
+CMD ["sh", "scripts/railway-entrypoint.sh"]
 

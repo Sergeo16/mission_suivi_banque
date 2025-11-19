@@ -199,6 +199,123 @@ docker-compose down
 
 ---
 
+### 🚂 Mode 4 : Déploiement sur Railway
+
+**Railway** est une plateforme de déploiement cloud qui simplifie le déploiement d'applications avec base de données.
+
+#### Prérequis
+
+- Un compte Railway (gratuit) : https://railway.app
+- Un compte GitHub (pour connecter le dépôt)
+
+#### Étapes de déploiement
+
+1. **Préparer le dépôt GitHub**
+
+   Assurez-vous que votre code est poussé sur GitHub :
+   ```bash
+   git add .
+   git commit -m "Préparation pour Railway"
+   git push origin main
+   ```
+
+2. **Créer un nouveau projet sur Railway**
+
+   - Allez sur https://railway.app
+   - Cliquez sur **"New Project"**
+   - Sélectionnez **"Deploy from GitHub repo"**
+   - Choisissez votre dépôt `mission_suivi_banque`
+
+3. **Ajouter un service PostgreSQL**
+
+   - Dans votre projet Railway, cliquez sur **"+ New"**
+   - Sélectionnez **"Database"** > **"Add PostgreSQL"**
+   - Railway créera automatiquement une base de données PostgreSQL
+   - La variable `DATABASE_URL` sera automatiquement injectée dans votre application
+
+4. **Configurer les variables d'environnement**
+
+   Dans les **Variables** de votre service web, ajoutez :
+
+   ```env
+   # Railway fournira automatiquement DATABASE_URL depuis le service PostgreSQL
+   # Assurez-vous que les deux services sont dans le même projet Railway
+   
+   # URL de l'application (remplacez par votre domaine Railway)
+   NEXT_PUBLIC_APP_URL=https://votre-app.railway.app
+   
+   # Mot de passe administrateur (pour le seed initial)
+   ADMIN_PASSWORD=admin123
+   
+   # Environnement
+   NODE_ENV=production
+   ```
+
+   **Note :** Railway génère automatiquement un domaine public. Vous pouvez le trouver dans l'onglet **Settings** > **Networking** de votre service web. Utilisez ce domaine pour `NEXT_PUBLIC_APP_URL`.
+
+5. **Déployer**
+
+   Railway détectera automatiquement le `Dockerfile` et commencera le déploiement. Le processus va :
+   - ✅ Construire l'image Docker
+   - ✅ Exécuter automatiquement les migrations au démarrage
+   - ✅ Exécuter le seed pour initialiser les données
+   - ✅ Démarrer l'application Next.js
+
+6. **Vérifier le déploiement**
+
+   - Une fois le déploiement terminé, Railway affichera l'URL de votre application
+   - Cliquez sur **"Generate Domain"** dans l'onglet **Networking** pour obtenir un domaine public
+   - Accédez à votre application via ce domaine
+
+#### Configuration Railway
+
+Le projet inclut un fichier `railway.json` qui configure :
+- Le builder Docker (utilise le `Dockerfile`)
+- Le script de démarrage qui exécute automatiquement les migrations
+- La politique de redémarrage en cas d'échec
+
+#### Variables d'environnement Railway
+
+Railway fournit automatiquement :
+- `DATABASE_URL` : URL de connexion PostgreSQL (depuis le service PostgreSQL)
+- `PORT` : Port sur lequel l'application doit écouter (géré automatiquement)
+- `RAILWAY_PUBLIC_DOMAIN` : Domaine public de votre application
+
+#### Commandes utiles Railway
+
+- **Voir les logs** : Onglet **Deployments** > Cliquez sur un déploiement > **View Logs**
+- **Redéployer** : Onglet **Deployments** > Cliquez sur **"Redeploy"**
+- **Accéder à la base de données** : Service PostgreSQL > Onglet **Data** > **Query**
+
+#### Dépannage Railway
+
+**L'application ne démarre pas :**
+- Vérifiez les logs dans l'onglet **Deployments**
+- Assurez-vous que `DATABASE_URL` est bien défini (vérifiez que le service PostgreSQL est dans le même projet)
+- Vérifiez que toutes les variables d'environnement sont correctement configurées
+
+**Les migrations échouent :**
+- Les migrations sont exécutées automatiquement au démarrage
+- Si elles échouent, vérifiez les logs pour voir l'erreur exacte
+- Vous pouvez exécuter manuellement les migrations via Railway CLI :
+  ```bash
+  railway run npm run migrate
+  ```
+
+**L'application redémarre en boucle :**
+- Vérifiez les logs pour identifier l'erreur
+- Assurez-vous que le port est correctement configuré (Railway le gère automatiquement)
+- Vérifiez que la base de données est accessible
+
+#### Mise à jour de l'application
+
+Pour mettre à jour l'application après des modifications :
+1. Poussez vos changements sur GitHub
+2. Railway détectera automatiquement les changements et redéploiera
+3. Les migrations seront réexécutées automatiquement au démarrage
+
+---
+
 ## Commandes NPM Disponibles
 
 ### Développement
