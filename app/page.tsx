@@ -535,7 +535,7 @@ export default function HomePage() {
               {showBareme && (
                 <div className="modal modal-open">
                   <div className="modal-box max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" ref={baremeModalRef}>
-                    <h3 className="font-bold text-lg mb-4">Barème d'évaluation</h3>
+                    <h3 className="font-bold text-lg mb-4">Barème d&apos;évaluation</h3>
                     <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                       {bareme.map((item) => (
                         <div key={item.note} className="border-b pb-2">

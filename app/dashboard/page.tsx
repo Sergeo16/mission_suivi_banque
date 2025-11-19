@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -105,11 +105,7 @@ export default function DashboardPage() {
     }
   }, [filters.villeId]);
 
-  useEffect(() => {
-    loadStatistics();
-  }, [filters, isAuthenticated]);
-
-  const loadStatistics = async () => {
+  const loadStatistics = useCallback(async () => {
     const token = localStorage.getItem('session_token');
     if (!token) return;
 
@@ -135,7 +131,13 @@ export default function DashboardPage() {
       console.error('Error loading statistics:', error);
       toast.error('Erreur lors du chargement des statistiques');
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadStatistics();
+    }
+  }, [loadStatistics, isAuthenticated]);
 
   const handleExport = async () => {
     const token = localStorage.getItem('session_token');
@@ -353,7 +355,7 @@ export default function DashboardPage() {
                     <th>Établissement</th>
                     <th>Ville</th>
                     <th>Moyenne</th>
-                    <th>Nombre d'évaluations</th>
+                    <th>Nombre d&apos;évaluations</th>
                   </tr>
                 </thead>
                 <tbody>
