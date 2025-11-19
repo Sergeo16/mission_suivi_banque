@@ -15,12 +15,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: NEXT_PUBLIC_APP_URL
-        sync: false  # À définir manuellement avec votre URL Render après le déploiement
-      - key: ADMIN_PASSWORD
-        value: admin123
-        sync: false  # Changez en production
-      # DATABASE_URL sera ajouté manuellement en liant la base de données PostgreSQL
+      # NEXT_PUBLIC_APP_URL et ADMIN_PASSWORD seront ajoutés manuellement après le déploiement
+      # DATABASE_URL sera ajouté automatiquement en liant la base de données PostgreSQL
       # Créez d'abord la DB dans Render Dashboard > New > PostgreSQL
       # Puis dans ce service > Environment > Link Resource > Sélectionnez votre DB
     healthCheckPath: /
