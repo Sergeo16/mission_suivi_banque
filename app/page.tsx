@@ -344,13 +344,12 @@ export default function HomePage() {
 
       if (response.ok) {
         toast.success('Évaluation enregistrée avec succès.');
-        // Réinitialiser le formulaire
-        setSelectedVille(null);
-        setSelectedEtablissement(null);
-        setSelectedPeriode(null);
-        setSelectedControleur(null);
+        // Conserver les sélections pour permettre de changer de volet facilement
+        // Réinitialiser seulement le volet et les évaluations
         setSelectedVolet(null);
         setEvaluations({});
+        // Les autres champs (Ville, Établissement, Période, Contrôleur) sont conservés
+        // Si l'utilisateur change de ville, les champs dépendants seront réinitialisés automatiquement
       } else {
         toast.error(data.error || 'Erreur lors de l\'enregistrement');
       }
