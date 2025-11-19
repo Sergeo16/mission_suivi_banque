@@ -26,7 +26,20 @@ git push origin main
 1. Dans votre projet Railway, cliquez sur **"+ New"**
 2. Sélectionnez **"Database"** > **"Add PostgreSQL"**
 3. Railway créera automatiquement une base de données
-4. La variable `DATABASE_URL` sera automatiquement disponible pour votre service web
+4. **IMPORTANT** : La variable `DATABASE_URL` devrait être automatiquement injectée dans votre service web
+
+**Si `DATABASE_URL` n'est pas automatiquement disponible :**
+
+1. Allez dans votre service web (celui qui déploie l'application)
+2. Cliquez sur l'onglet **"Variables"**
+3. Cliquez sur **"New Variable"**
+4. Dans le champ **"Variable"**, entrez : `DATABASE_URL`
+5. Dans le champ **"Value"**, cliquez sur **"Reference"** et sélectionnez votre service PostgreSQL
+6. Railway vous proposera une syntaxe comme : `${{Postgres.DATABASE_URL}}`
+   - Remplacez `Postgres` par le nom exact de votre service PostgreSQL (visible dans l'onglet **"Settings"** du service PostgreSQL)
+7. Cliquez sur **"Add"**
+
+**Alternative** : Vous pouvez aussi copier directement la valeur de `DATABASE_URL` depuis l'onglet **"Variables"** de votre service PostgreSQL et la coller dans les variables de votre service web.
 
 ### Étape 4 : Configurer les variables d'environnement
 
@@ -81,11 +94,34 @@ Le projet inclut les fichiers suivants pour Railway :
 
 ## 🐛 Dépannage
 
+### Erreur "DATABASE_URL n'est pas défini"
+
+Cette erreur signifie que Railway n'a pas injecté automatiquement la variable `DATABASE_URL` dans votre service web.
+
+**Solution :**
+
+1. **Vérifiez que PostgreSQL est dans le même projet** :
+   - Ouvrez votre projet Railway
+   - Vérifiez que vous voyez à la fois le service web ET le service PostgreSQL dans la liste des services
+
+2. **Ajoutez manuellement DATABASE_URL** :
+   - Cliquez sur votre service web
+   - Allez dans l'onglet **"Variables"**
+   - Cliquez sur **"New Variable"**
+   - **Variable** : `DATABASE_URL`
+   - **Value** : Cliquez sur **"Reference"** et sélectionnez votre service PostgreSQL
+   - Railway générera automatiquement : `${{NomDuService.DATABASE_URL}}`
+   - Cliquez sur **"Add"**
+
+3. **Redéployez** :
+   - Après avoir ajouté la variable, Railway redéploiera automatiquement
+   - Ou cliquez manuellement sur **"Redeploy"** dans l'onglet **"Deployments"**
+
 ### L'application ne démarre pas
 
 1. Vérifiez les logs dans **Deployments** > **View Logs**
 2. Assurez-vous que le service PostgreSQL est dans le même projet Railway
-3. Vérifiez que `DATABASE_URL` est bien défini (visible dans les variables d'environnement)
+3. Vérifiez que `DATABASE_URL` est bien défini (visible dans les variables d'environnement du service web)
 
 ### Les migrations échouent
 

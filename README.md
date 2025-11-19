@@ -289,6 +289,13 @@ Railway fournit automatiquement :
 
 #### Dépannage Railway
 
+**Erreur "DATABASE_URL n'est pas défini" :**
+- Railway devrait injecter automatiquement `DATABASE_URL` quand PostgreSQL est dans le même projet
+- Si ce n'est pas le cas, ajoutez manuellement dans votre service web > **Variables** :
+  - **Variable** : `DATABASE_URL`
+  - **Value** : Utilisez **"Reference"** pour référencer votre service PostgreSQL (`${{NomDuService.DATABASE_URL}}`)
+- Redéployez après avoir ajouté la variable
+
 **L'application ne démarre pas :**
 - Vérifiez les logs dans l'onglet **Deployments**
 - Assurez-vous que `DATABASE_URL` est bien défini (vérifiez que le service PostgreSQL est dans le même projet)
