@@ -26,11 +26,14 @@ Guide étape par étape pour déployer votre application sur Render.
 
 #### Option A : Utiliser render.yaml (Recommandé)
 
-1. Assurez-vous que `render.yaml` est dans votre dépôt
-2. Dans Render, cliquez sur **"New +"** > **"Blueprint"**
-3. Connectez votre dépôt GitHub
-4. Render détectera automatiquement `render.yaml`
-5. Cliquez sur **"Apply"**
+1. **IMPORTANT** : Créez d'abord la base de données PostgreSQL (Étape 2 ci-dessus)
+2. Assurez-vous que `render.yaml` est dans votre dépôt
+3. Dans Render, cliquez sur **"New +"** > **"Blueprint"**
+4. Connectez votre dépôt GitHub
+5. Render détectera automatiquement `render.yaml`
+6. Cliquez sur **"Apply"** pour créer le service web
+7. **Après le déploiement** : Allez dans votre service web > **Environment** > **Link Resource** > Sélectionnez votre base de données PostgreSQL
+   - Cela ajoutera automatiquement `DATABASE_URL` dans les variables d'environnement
 
 #### Option B : Configuration manuelle
 
