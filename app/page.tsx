@@ -518,17 +518,28 @@ export default function HomePage() {
         {activeVolet && activeVolet.rubriques && activeVolet.rubriques.length > 0 && (
           <div className="card bg-base-100 shadow-xl overflow-x-hidden">
             <div className="card-body p-4 sm:p-6 overflow-x-hidden">
-              <div className="flex items-center justify-between mb-4 gap-2">
-                <h2 className="card-title text-sm sm:text-base md:text-lg truncate">{activeVolet.libelle}</h2>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline flex-shrink-0"
-                  onClick={() => setShowBareme(true)}
-                >
-                  <Info size={16} className="mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Afficher le barème</span>
-                  <span className="sm:hidden">Barème</span>
-                </button>
+              <div className="mb-4">
+                <h2 className="card-title text-sm sm:text-base md:text-lg mb-2 sm:mb-0">{activeVolet.libelle}</h2>
+                <div className="sm:hidden mt-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline w-full"
+                    onClick={() => setShowBareme(true)}
+                  >
+                    <Info size={16} className="mr-2" />
+                    <span>Barème</span>
+                  </button>
+                </div>
+                <div className="hidden sm:block">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline flex-shrink-0"
+                    onClick={() => setShowBareme(true)}
+                  >
+                    <Info size={16} className="mr-2" />
+                    <span>Afficher le barème</span>
+                  </button>
+                </div>
               </div>
 
               {/* Modal du barème */}
@@ -705,22 +716,24 @@ export default function HomePage() {
         )}
 
         {/* Boutons d'action */}
-        <div className="flex gap-4">
-          <button
-            type="button"
-            className="btn btn-error flex-1"
-            onClick={handleCancel}
-            disabled={isSubmitting}
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            className="btn btn-accent flex-1"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Enregistrement...' : 'Valider'}
-          </button>
+        <div className="form-control mt-6">
+          <div className="flex gap-4">
+            <button
+              type="button"
+              className="btn btn-outline flex-1"
+              onClick={handleCancel}
+              disabled={isSubmitting}
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary flex-1"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Enregistrement...' : 'Valider'}
+            </button>
+          </div>
         </div>
       </form>
     </div>

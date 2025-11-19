@@ -249,8 +249,8 @@ export async function GET(request: NextRequest) {
         const dataRow: any[] = [
           rubrique.numero, // N°
           composante, // Composante évaluée (sans numéro)
-          rubrique.criteres_indicateurs || '', // Critères / Indicateurs
-          rubrique.mode_verification || '', // Mode de vérification
+          rubrique.criteres_indicateurs ?? '', // Critères / Indicateurs (utilise ?? pour gérer null/undefined)
+          rubrique.mode_verification ?? '', // Mode de vérification (utilise ?? pour gérer null/undefined)
           moyenne > 0 ? moyenne.toFixed(2) : '', // Moyenne / 5
           moyenne > 0 ? getAppreciation(moyenne, bareme) : '' // Observations
         ];

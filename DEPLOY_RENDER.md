@@ -58,15 +58,44 @@ Guide étape par étape pour déployer votre application sur Render.
 
 6. Cliquez sur **"Create Web Service"**
 
-### Étape 4 : Attendre le déploiement
+### Étape 4 : Charger les données depuis synthese.xlsx
+
+**IMPORTANT** : Après le déploiement, vous devez charger les données des rubriques depuis le fichier `synthese.xlsx`.
+
+#### Méthode 1 : Utiliser Render Shell (Recommandé)
+
+1. Dans votre service web `mission-suivi-banque`, allez dans l'onglet **"Shell"**
+2. Si vous ne voyez pas l'onglet Shell, cliquez sur **"Manual Deploy"** > **"Deploy latest commit"** pour vous assurer que le service est actif
+3. Une fois dans le Shell, exécutez :
+   ```bash
+   npm run update-rubriques
+   ```
+4. Attendez que le script se termine (vous verrez les messages de confirmation)
+5. Les données des colonnes "Critères / Indicateurs" et "Mode de vérification" seront maintenant dans la base de données
+
+#### Méthode 2 : Via Render CLI (si installé)
+
+Si vous avez Render CLI installé localement :
+```bash
+render exec mission-suivi-banque -- npm run update-rubriques
+```
+
+#### Méthode 3 : Exécuter manuellement via Railway CLI (si vous avez aussi Railway)
+
+Si vous avez Railway CLI installé :
+```bash
+railway run npm run update-rubriques
+```
+
+### Étape 5 : Attendre le déploiement
 
 Render va :
 1. ✅ Construire l'image Docker
-2. ✅ Exécuter automatiquement les migrations (via `railway-entrypoint.sh`)
+2. ✅ Exécuter automatiquement les migrations (via `deploy-entrypoint.sh`)
 3. ✅ Exécuter le seed
 4. ✅ Démarrer l'application
 
-### Étape 5 : Obtenir votre URL
+### Étape 6 : Obtenir votre URL
 
 Une fois le déploiement terminé :
 1. Render génère automatiquement une URL : `https://mission-suivi-banque.onrender.com`
@@ -111,10 +140,20 @@ psql $RENDER_DATABASE_URL < backup.sql
 ### Les migrations échouent
 
 Les migrations s'exécutent automatiquement au démarrage. Si elles échouent :
-1. Consultez les logs pour voir l'erreur
+1. Consultez les logs pour voir l'erreur exacte
 2. Vous pouvez exécuter manuellement via Render Shell :
-   - Render > Shell
+   - Allez dans votre service > **Shell**
    - `npm run migrate`
+
+### Les colonnes "Critères / Indicateurs" et "Mode de vérification" sont vides dans l'export
+
+Cela signifie que les données n'ont pas été chargées depuis `synthese.xlsx`. Pour corriger :
+
+1. Assurez-vous que le fichier `synthese.xlsx` est présent dans votre dépôt GitHub
+2. Exécutez le script de mise à jour via Render Shell :
+   - Allez dans votre service web > **Shell**
+   - Exécutez : `npm run update-rubriques`
+3. Vérifiez les logs pour confirmer que les données ont été chargées
 
 ### L'application "sleep" trop souvent
 
@@ -127,6 +166,7 @@ Les migrations s'exécutent automatiquement au démarrage. Si elles échouent :
 - **PostgreSQL Free** : Valable 90 jours, puis $7/mois ou recréer
 - **Build Time** : Limité à 90 minutes sur le plan gratuit
 - **Bandwidth** : 100GB/mois sur le plan gratuit
+- **Fichier synthese.xlsx** : Doit être présent dans le dépôt pour charger les données des rubriques
 
 ## 🔄 Mise à jour
 
@@ -139,4 +179,3 @@ Pour mettre à jour l'application :
 
 - Documentation Render : https://render.com/docs
 - Support Render : https://render.com/docs/support
-
