@@ -52,6 +52,7 @@ export default function AdminPage() {
   const [filterPeriode, setFilterPeriode] = useState<number | null>(null);
   const [filterControleur, setFilterControleur] = useState<number | null>(null);
   const [filterVolet, setFilterVolet] = useState<number | null>(null);
+  const [isUpdatingRubriques, setIsUpdatingRubriques] = useState(false);
 
   useEffect(() => {
     // Charger les données directement sans authentification
@@ -141,6 +142,36 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Error exporting:', error);
       toast.error('Erreur lors de l\'export Excel');
+    }
+  };
+
+  const handleUpdateRubriques = async () => {
+    setIsUpdatingRubriques(true);
+    try {
+      // L'authentification est gérée côté serveur via ADMIN_PASSWORD
+      const response = await fetch('/api/admin/update-rubriques', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de la mise à jour');
+      }
+
+      if (data.skipped) {
+        toast.info(data.message);
+      } else {
+        toast.success(data.message || `✅ ${data.updated} rubriques mises à jour avec succès`);
+      }
+    } catch (error: any) {
+      console.error('Error updating rubriques:', error);
+      toast.error(error.message || 'Erreur lors de la mise à jour des rubriques');
+    } finally {
+      setIsUpdatingRubriques(false);
     }
   };
 
@@ -345,15 +376,44 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="btn btn-accent"
-                onClick={handleExport}
-              >
-                <Download className="mr-2" size={16} />
-                Exporter
-              </button>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-4">
+              <div className="alert alert-info">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div className="text-sm">
+                  <div className="font-bold">Données des rubriques</div>
+                  <div>Si les colonnes &quot;Critères / Indicateurs&quot; et &quot;Mode de vérification&quot; sont vides dans l&apos;export, cliquez sur le bouton ci-dessous pour charger les données depuis synthese.xlsx</div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={handleUpdateRubriques}
+                  disabled={isUpdatingRubriques}
+                >
+                  {isUpdatingRubriques ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      Chargement...
+                    </>
+                  ) : (
+                    <>
+                      <Settings className="mr-2" size={16} />
+                      Charger les données des rubriques
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-accent"
+                  onClick={handleExport}
+                >
+                  <Download className="mr-2" size={16} />
+                  Exporter
+                </button>
+              </div>
             </div>
           </div>
         </div>

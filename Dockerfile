@@ -53,6 +53,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
 COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./next.config.js
+# Copier le fichier synthese.xlsx pour charger les données des rubriques
+COPY --from=builder --chown=nextjs:nodejs /app/synthese.xlsx ./synthese.xlsx
 
 # Installer les dépendances nécessaires pour les scripts (dotenv, pg) dans node_modules
 # Ces packages sont nécessaires pour les scripts de migration et seed

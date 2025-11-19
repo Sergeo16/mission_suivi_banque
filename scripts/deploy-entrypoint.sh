@@ -45,6 +45,16 @@ npm run migrate || echo "⚠️  Migrations déjà exécutées ou erreur (non bl
 echo "🌱 Exécution du seed..."
 npm run seed || echo "⚠️  Seed déjà exécuté ou erreur (non bloquant)"
 
+# Charger les données des rubriques depuis synthese.xlsx (seulement si pas déjà chargées)
+echo "📋 Vérification des données des rubriques..."
+if [ -f "synthese.xlsx" ]; then
+  echo "🔄 Chargement des données depuis synthese.xlsx..."
+  npm run update-rubriques || echo "⚠️  Données déjà chargées ou erreur (non bloquant)"
+else
+  echo "⚠️  Fichier synthese.xlsx non trouvé, les colonnes Critères/Indicateurs et Mode de vérification seront vides"
+  echo "   Pour charger les données, utilisez l'endpoint /api/admin/update-rubriques"
+fi
+
 echo "✅ Initialisation terminée!"
 
 # Démarrer l'application Next.js

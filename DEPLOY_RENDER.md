@@ -62,30 +62,38 @@ Guide étape par étape pour déployer votre application sur Render.
 
 **IMPORTANT** : Après le déploiement, vous devez charger les données des rubriques depuis le fichier `synthese.xlsx`.
 
-#### Méthode 1 : Utiliser Render Shell (Recommandé)
+#### Méthode 1 : Via l'interface Admin (Recommandé pour Plan Free) ⭐
+
+**Cette méthode fonctionne même avec le plan gratuit de Render (pas besoin de Shell)** :
+
+1. Accédez à votre application : `https://mission-suivi-banque.onrender.com/admin`
+2. L'onglet **"Synthèse"** est sélectionné par défaut
+3. Vous verrez une alerte bleue avec des informations
+4. Cliquez sur le bouton **"Charger les données des rubriques"** (à côté du bouton "Exporter")
+5. Attendez quelques secondes - un message de succès s'affichera
+6. Les données des colonnes "Critères / Indicateurs" et "Mode de vérification" seront maintenant dans la base de données
+
+**Note** : Le script essaie aussi de charger automatiquement les données au démarrage si le fichier `synthese.xlsx` est présent.
+
+#### Méthode 2 : Utiliser Render Shell (Plan Payant uniquement)
+
+Si vous avez accès au Shell (plan payant) :
 
 1. Dans votre service web `mission-suivi-banque`, allez dans l'onglet **"Shell"**
-2. Si vous ne voyez pas l'onglet Shell, cliquez sur **"Manual Deploy"** > **"Deploy latest commit"** pour vous assurer que le service est actif
-3. Une fois dans le Shell, exécutez :
+2. Exécutez :
    ```bash
    npm run update-rubriques
    ```
-4. Attendez que le script se termine (vous verrez les messages de confirmation)
-5. Les données des colonnes "Critères / Indicateurs" et "Mode de vérification" seront maintenant dans la base de données
+3. Attendez que le script se termine
 
-#### Méthode 2 : Via Render CLI (si installé)
+#### Méthode 3 : Via Render CLI (si installé)
 
 Si vous avez Render CLI installé localement :
 ```bash
 render exec mission-suivi-banque -- npm run update-rubriques
 ```
 
-#### Méthode 3 : Exécuter manuellement via Railway CLI (si vous avez aussi Railway)
-
-Si vous avez Railway CLI installé :
-```bash
-railway run npm run update-rubriques
-```
+> 💡 **Pour plus de détails**, consultez [`CHARGER_DONNEES_RUBRIQUES.md`](./CHARGER_DONNEES_RUBRIQUES.md)
 
 ### Étape 5 : Attendre le déploiement
 
