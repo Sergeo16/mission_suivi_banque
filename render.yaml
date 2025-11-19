@@ -25,9 +25,7 @@ services:
     autoDeploy: true
 
   # Base de données PostgreSQL
-  - type: pspg
+  - type: pg
     name: mission-suivi-banque-db
     plan: free
-    databaseName: mission_suivi_banque
-    user: mission_banque_user
 
