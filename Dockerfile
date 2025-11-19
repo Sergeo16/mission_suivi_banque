@@ -14,6 +14,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Créer le répertoire public s'il n'existe pas (requis par Next.js)
+RUN mkdir -p ./public
+
 ENV NEXT_TELEMETRY_DISABLED 1
 
 RUN npm run build
@@ -32,10 +35,8 @@ RUN adduser --system --uid 1001 nextjs
 RUN npm install -g tsx
 
 # Créer le répertoire public (même s'il est vide, Next.js en a besoin)
+# Le répertoire public est vide, donc on le crée simplement sans copier depuis le builder
 RUN mkdir -p ./public
-
-# Copier les fichiers publics (le répertoire existe maintenant avec .gitkeep)
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Copier le build standalone (le contenu de standalone est copié à la racine)
 # Cela inclut server.js, node_modules, package.json, etc.
