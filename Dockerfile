@@ -35,6 +35,7 @@ RUN adduser --system --uid 1001 nextjs
 RUN npm install -g tsx
 
 # Créer le répertoire public (même s'il est vide, Next.js en a besoin)
+# IMPORTANT: Ne pas copier depuis le builder car le répertoire peut ne pas exister
 # Le répertoire public est vide, donc on le crée simplement sans copier depuis le builder
 RUN mkdir -p ./public
 
