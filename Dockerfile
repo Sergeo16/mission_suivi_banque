@@ -31,8 +31,11 @@ RUN adduser --system --uid 1001 nextjs
 # Installer tsx globalement pour les migrations et seed
 RUN npm install -g tsx
 
-# Copier les fichiers publics
-COPY --from=builder /app/public ./public
+# Créer le répertoire public (même s'il est vide, Next.js en a besoin)
+RUN mkdir -p ./public
+
+# Copier les fichiers publics (le répertoire existe maintenant avec .gitkeep)
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Copier le build standalone (le contenu de standalone est copié à la racine)
 # Cela inclut server.js, node_modules, package.json, etc.
