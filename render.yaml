@@ -1,0 +1,33 @@
+# Configuration Render pour déploiement automatique
+# Documentation: https://render.com/docs/yaml-spec
+
+services:
+  # Service web (Next.js)
+  - type: web
+    name: mission-suivi-banque
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false  # À définir manuellement avec votre URL Render
+      - key: ADMIN_PASSWORD
+        value: admin123
+        sync: false  # Changez en production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mission-suivi-banque-db
+          property: connectionString
+    healthCheckPath: /
+    autoDeploy: true
+
+  # Base de données PostgreSQL
+  - type: pspg
+    name: mission-suivi-banque-db
+    plan: free
+    databaseName: mission_suivi_banque
+    user: mission_banque_user
+

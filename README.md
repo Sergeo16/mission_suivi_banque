@@ -203,6 +203,8 @@ docker-compose down
 
 **Railway** est une plateforme de déploiement cloud qui simplifie le déploiement d'applications avec base de données.
 
+> 💡 **Limite Railway atteinte ?** Consultez [`DEPLOIEMENT_ALTERNATIVES.md`](./DEPLOIEMENT_ALTERNATIVES.md) pour des alternatives gratuites (Render, Fly.io, Vercel+Supabase, etc.)
+
 #### Prérequis
 
 - Un compte Railway (gratuit) : https://railway.app
