@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { Settings, Users, Building2, Calendar, UserCheck, Shield, BarChart3, Download, FileText, Trash2, Eye, X } from 'lucide-react';
+import { Settings, Users, Building2, Calendar, UserCheck, Shield, BarChart3, Download, FileText, Trash2, Eye, X, LogOut } from 'lucide-react';
 
 interface Ville {
   id: number;
@@ -85,6 +85,10 @@ interface EvaluationDetail {
 export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showLoginForm, setShowLoginForm] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('sergeobusiness1@gmail.com');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [activeTab, setActiveTab] = useState<'synthese' | 'controleurs' | 'evaluations' | 'maintenance' | 'users' | 'referentiels'>('synthese');
 
@@ -142,7 +146,8 @@ export default function AdminPage() {
     try {
       const token = getAuthToken();
       if (!token) {
-        window.location.href = '/login?redirect=/admin';
+        setIsLoading(false);
+        setShowLoginForm(true);
         return;
       }
 
@@ -152,7 +157,8 @@ export default function AdminPage() {
       const data = await response.json();
 
       if (!data.user || data.user.role !== 'admin') {
-        window.location.href = '/login?redirect=/admin';
+        setIsLoading(false);
+        setShowLoginForm(true);
         return;
       }
 
@@ -162,7 +168,44 @@ export default function AdminPage() {
       setIsLoading(false);
     } catch (error) {
       console.error('Error checking authentication:', error);
-      window.location.href = '/login?redirect=/admin';
+      setIsLoading(false);
+      setShowLoginForm(true);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.token) {
+        if (data.user?.role !== 'admin') {
+          toast.error('Accès refusé. Seuls les administrateurs peuvent accéder à cette page.');
+          setIsLoggingIn(false);
+          return;
+        }
+        localStorage.setItem('session_token', data.token);
+        toast.success('Connexion réussie');
+        setShowLoginForm(false);
+        setIsAuthenticated(true);
+        loadMaintenanceStatus();
+        loadSyntheseData();
+      } else {
+        toast.error(data.error || 'Email ou mot de passe incorrect');
+      }
+    } catch (error) {
+      console.error('Error logging in:', error);
+      toast.error('Erreur lors de la connexion');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -489,7 +532,33 @@ export default function AdminPage() {
     }
   };
 
-  if (isLoading || !isAuthenticated) {
+  const handleLogout = async () => {
+    try {
+      const token = getAuthToken();
+      if (token) {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+      }
+      localStorage.removeItem('session_token');
+      toast.success('Déconnexion réussie');
+      // Réinitialiser l'état et afficher le formulaire de connexion
+      setIsAuthenticated(false);
+      setShowLoginForm(true);
+      setLoginPassword('');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      // Déconnexion même en cas d'erreur
+      localStorage.removeItem('session_token');
+      setIsAuthenticated(false);
+      setShowLoginForm(true);
+      setLoginPassword('');
+    }
+  };
+
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <span className="loading loading-spinner loading-lg"></span>
@@ -497,11 +566,78 @@ export default function AdminPage() {
     );
   }
 
+  // Afficher le formulaire de connexion si non authentifié
+  if (!isAuthenticated || showLoginForm) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-8">
+        <div className="card bg-base-100 shadow-xl">
+          <div className="card-body p-6">
+            <div className="flex items-center justify-center mb-6">
+              <Building2 className="text-accent" size={48} />
+            </div>
+            <h1 className="text-2xl font-bold text-center mb-6">Connexion Admin</h1>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Email</span>
+                </label>
+                <input
+                  type="email"
+                  className="input input-bordered"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  required
+                  disabled={isLoggingIn}
+                />
+              </div>
+
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text">Mot de passe</span>
+                </label>
+                <input
+                  type="password"
+                  className="input input-bordered"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                  disabled={isLoggingIn}
+                />
+              </div>
+
+              <div className="form-control mt-6">
+                <button
+                  type="submit"
+                  className="btn btn-primary w-full"
+                  disabled={isLoggingIn}
+                >
+                  {isLoggingIn ? 'Connexion...' : 'Se connecter'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center">
-        Administration
-      </h1>
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold">
+          Administration
+        </h1>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="btn btn-outline btn-error btn-sm sm:btn-md"
+          title="Déconnexion"
+        >
+          <LogOut className="mr-1 sm:mr-2" size={16} />
+          <span className="hidden sm:inline">Déconnexion</span>
+        </button>
+      </div>
 
       <div className="tabs tabs-boxed mb-4 sm:mb-6 overflow-x-auto">
         <button

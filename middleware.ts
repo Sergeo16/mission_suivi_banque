@@ -1,29 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifyAuth } from './lib/auth';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Protéger la route /admin
-  if (pathname.startsWith('/admin')) {
-    const authResult = await verifyAuth(request);
-    
-    if (!authResult.user) {
-      // Rediriger vers la page de connexion si non authentifié
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    // Vérifier que l'utilisateur est admin
-    if (authResult.user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Accès refusé. Seuls les administrateurs peuvent accéder à cette page.' },
-        { status: 403 }
-      );
-    }
-  }
+  // La route /admin est accessible sans redirection
+  // La page admin gère elle-même l'authentification et affiche le formulaire si nécessaire
+  // Pas de protection au niveau du middleware pour éviter les redirections automatiques
 
   return NextResponse.next();
 }
