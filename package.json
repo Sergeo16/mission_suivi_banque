@@ -9,6 +9,7 @@
     "lint": "next lint",
     "migrate": "npx tsx scripts/migrate.ts",
     "seed": "npx tsx scripts/seed.ts",
+    "create-admin": "npx tsx scripts/create-admin-user.ts",
     "update-rubriques": "npx tsx scripts/update-rubriques-from-excel.ts",
     "update-bareme": "npx tsx scripts/update-bareme-from-excel.ts",
     "docker:dev": "docker-compose -f docker-compose.dev.yml up",

@@ -55,6 +55,15 @@ else
   echo "   Pour charger les données, utilisez l'endpoint /api/admin/update-rubriques"
 fi
 
+# Créer l'utilisateur admin si ADMIN_PASSWORD est défini
+if [ -n "$ADMIN_PASSWORD" ]; then
+  echo "👤 Création/mise à jour de l'utilisateur admin..."
+  npm run create-admin || echo "⚠️  Erreur lors de la création de l'utilisateur admin (non bloquant)"
+else
+  echo "⚠️  ADMIN_PASSWORD n'est pas défini, l'utilisateur admin ne sera pas créé"
+  echo "   Pour créer l'utilisateur admin, définissez ADMIN_PASSWORD et exécutez: npm run create-admin"
+fi
+
 echo "✅ Initialisation terminée!"
 
 # Démarrer l'application Next.js

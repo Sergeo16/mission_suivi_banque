@@ -41,7 +41,14 @@ export default function LoginPage() {
       if (response.ok && data.token) {
         localStorage.setItem('session_token', data.token);
         toast.success('Connexion réussie!');
-        router.push('/');
+        
+        // Rediriger vers /admin si l'utilisateur est admin, sinon vers la page d'origine ou /
+        const redirectUrl = new URLSearchParams(window.location.search).get('redirect');
+        if (data.user?.role === 'admin') {
+          router.push(redirectUrl || '/admin');
+        } else {
+          router.push(redirectUrl || '/');
+        }
       } else {
         toast.error(data.error || 'Erreur lors de la connexion');
       }

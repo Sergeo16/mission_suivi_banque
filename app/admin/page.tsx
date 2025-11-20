@@ -84,6 +84,7 @@ interface EvaluationDetail {
 
 export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [activeTab, setActiveTab] = useState<'synthese' | 'controleurs' | 'evaluations' | 'maintenance' | 'users' | 'referentiels'>('synthese');
 
@@ -134,10 +135,36 @@ export default function AdminPage() {
   const [showEvaluationModal, setShowEvaluationModal] = useState(false);
 
   useEffect(() => {
-    loadMaintenanceStatus();
-    loadSyntheseData();
-    setIsLoading(false);
+    checkAuthentication();
   }, []);
+
+  const checkAuthentication = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        window.location.href = '/login?redirect=/admin';
+        return;
+      }
+
+      const response = await fetch('/api/auth/me', {
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+
+      if (!data.user || data.user.role !== 'admin') {
+        window.location.href = '/login?redirect=/admin';
+        return;
+      }
+
+      setIsAuthenticated(true);
+      loadMaintenanceStatus();
+      loadSyntheseData();
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      window.location.href = '/login?redirect=/admin';
+    }
+  };
 
   const loadSyntheseData = async () => {
     try {
@@ -462,7 +489,7 @@ export default function AdminPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !isAuthenticated) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <span className="loading loading-spinner loading-lg"></span>
