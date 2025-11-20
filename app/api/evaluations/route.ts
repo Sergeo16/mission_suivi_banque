@@ -8,6 +8,7 @@ const evaluationSchema = z.object({
   etablissementVisiteId: z.number().int().positive(),
   controleurId: z.number().int().positive(),
   voletId: z.number().int().positive(),
+  replace: z.boolean().optional().default(false),
   rubriques: z.array(
     z.object({
       rubriqueId: z.number().int().positive(),
@@ -26,6 +27,25 @@ export async function POST(request: NextRequest) {
     await pool.query('BEGIN');
 
     try {
+      // Si replace est true, supprimer les évaluations existantes pour cette combinaison
+      if (validatedData.replace) {
+        await pool.query(
+          `DELETE FROM evaluation
+           WHERE mission_id = $1
+             AND ville_id = $2
+             AND etablissement_visite_id = $3
+             AND controleur_id = $4
+             AND volet_id = $5`,
+          [
+            validatedData.missionId,
+            validatedData.villeId,
+            validatedData.etablissementVisiteId,
+            validatedData.controleurId,
+            validatedData.voletId,
+          ]
+        );
+      }
+
       // Insérer chaque évaluation de rubrique
       for (const rubrique of validatedData.rubriques) {
         await pool.query(

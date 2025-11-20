@@ -1,0 +1,280 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getPool } from '@/lib/db';
+import { verifyAuth } from '@/lib/auth';
+
+export async function GET(request: NextRequest) {
+  try {
+    // Vérifier l'authentification admin
+    const authResult = await verifyAuth(request);
+    if (!authResult.user || authResult.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Non autorisé' },
+        { status: 403 }
+      );
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const controleurId = searchParams.get('controleurId');
+    const voletId = searchParams.get('voletId');
+    const periodeId = searchParams.get('periodeId');
+    const etablissementId = searchParams.get('etablissementId');
+    const villeId = searchParams.get('villeId');
+
+    if (!controleurId || !voletId || !periodeId || !etablissementId || !villeId) {
+      return NextResponse.json(
+        { error: 'Tous les paramètres sont requis' },
+        { status: 400 }
+      );
+    }
+
+    const pool = getPool();
+
+    // Trouver la mission correspondante à la période
+    const periodeResult = await pool.query(
+      'SELECT id, date_debut, date_fin FROM periode WHERE id = $1',
+      [parseInt(periodeId, 10)]
+    );
+
+    if (periodeResult.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Période non trouvée' },
+        { status: 404 }
+      );
+    }
+
+    const periode = periodeResult.rows[0];
+
+    // Trouver la mission correspondante
+    const missionResult = await pool.query(
+      `SELECT id FROM mission 
+       WHERE date_debut = $1 AND date_fin = $2 
+       LIMIT 1`,
+      [periode.date_debut, periode.date_fin]
+    );
+
+    if (missionResult.rows.length === 0) {
+      return NextResponse.json({
+        evaluation: null,
+        rubriques: [],
+      });
+    }
+
+    const missionId = missionResult.rows[0].id;
+
+    // Récupérer les informations de l'évaluation
+    const evaluationInfoResult = await pool.query(
+      `SELECT DISTINCT
+         e.date_evaluation,
+         e.created_at,
+         c.nom || ' ' || c.prenom as controleur_nom,
+         v.nom as ville_nom,
+         et.nom as etablissement_nom,
+         vo.libelle as volet_libelle,
+         p.libelle as periode_libelle
+       FROM evaluation e
+       JOIN controleur c ON e.controleur_id = c.id
+       JOIN ville v ON e.ville_id = v.id
+       JOIN etablissement_visite et ON e.etablissement_visite_id = et.id
+       JOIN volet vo ON e.volet_id = vo.id
+       JOIN periode p ON p.date_debut = (SELECT date_debut FROM mission WHERE id = e.mission_id LIMIT 1)
+         AND p.date_fin = (SELECT date_fin FROM mission WHERE id = e.mission_id LIMIT 1)
+       WHERE e.mission_id = $1
+         AND e.ville_id = $2
+         AND e.etablissement_visite_id = $3
+         AND e.controleur_id = $4
+         AND e.volet_id = $5
+       LIMIT 1`,
+      [
+        missionId,
+        parseInt(villeId, 10),
+        parseInt(etablissementId, 10),
+        parseInt(controleurId, 10),
+        parseInt(voletId, 10),
+      ]
+    );
+
+    if (evaluationInfoResult.rows.length === 0) {
+      return NextResponse.json({
+        evaluation: null,
+        rubriques: [],
+      });
+    }
+
+    const evaluationInfo = evaluationInfoResult.rows[0];
+
+    // Récupérer toutes les rubriques évaluées
+    const rubriquesResult = await pool.query(
+      `SELECT 
+         r.id as rubrique_id,
+         r.numero,
+         r.libelle,
+         r.composante_evaluee,
+         r.criteres_indicateurs,
+         r.mode_verification,
+         e.note,
+         e.commentaire,
+         e.date_evaluation,
+         e.created_at
+       FROM evaluation e
+       JOIN rubrique r ON e.rubrique_id = r.id
+       WHERE e.mission_id = $1
+         AND e.ville_id = $2
+         AND e.etablissement_visite_id = $3
+         AND e.controleur_id = $4
+         AND e.volet_id = $5
+       ORDER BY r.numero`,
+      [
+        missionId,
+        parseInt(villeId, 10),
+        parseInt(etablissementId, 10),
+        parseInt(controleurId, 10),
+        parseInt(voletId, 10),
+      ]
+    );
+
+    return NextResponse.json({
+      evaluation: {
+        controleur_nom: evaluationInfo.controleur_nom,
+        ville_nom: evaluationInfo.ville_nom,
+        etablissement_nom: evaluationInfo.etablissement_nom,
+        volet_libelle: evaluationInfo.volet_libelle,
+        periode_libelle: evaluationInfo.periode_libelle,
+        date_evaluation: evaluationInfo.date_evaluation,
+        date_soumission: evaluationInfo.created_at,
+      },
+      rubriques: rubriquesResult.rows.map((row) => ({
+        rubrique_id: row.rubrique_id,
+        numero: row.numero,
+        libelle: row.libelle,
+        composante_evaluee: row.composante_evaluee,
+        criteres_indicateurs: row.criteres_indicateurs,
+        mode_verification: row.mode_verification,
+        note: row.note,
+        commentaire: row.commentaire,
+        date_evaluation: row.date_evaluation,
+        created_at: row.created_at,
+      })),
+    });
+  } catch (error: any) {
+    console.error('Error fetching evaluation:', error);
+    return NextResponse.json(
+      { error: 'Erreur lors de la récupération de l\'évaluation' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    // Vérifier l'authentification admin
+    const authResult = await verifyAuth(request);
+    if (!authResult.user || authResult.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Non autorisé' },
+        { status: 403 }
+      );
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const controleurId = searchParams.get('controleurId');
+    const voletId = searchParams.get('voletId');
+    const periodeId = searchParams.get('periodeId');
+    const etablissementId = searchParams.get('etablissementId');
+    const villeId = searchParams.get('villeId');
+    const deleteAll = searchParams.get('deleteAll') === 'true';
+
+    const pool = getPool();
+    await pool.query('BEGIN');
+
+    try {
+      if (deleteAll) {
+        // Supprimer toutes les évaluations
+        const result = await pool.query('DELETE FROM evaluation RETURNING id');
+        await pool.query('COMMIT');
+        return NextResponse.json({
+          success: true,
+          deleted: result.rowCount,
+          message: `${result.rowCount} évaluation(s) supprimée(s)`,
+        });
+      } else {
+        // Supprimer une évaluation spécifique
+        if (!controleurId || !voletId || !periodeId || !etablissementId || !villeId) {
+          await pool.query('ROLLBACK');
+          return NextResponse.json(
+            { error: 'Tous les paramètres sont requis' },
+            { status: 400 }
+          );
+        }
+
+        // Trouver la mission correspondante à la période
+        const periodeResult = await pool.query(
+          'SELECT id, date_debut, date_fin FROM periode WHERE id = $1',
+          [parseInt(periodeId, 10)]
+        );
+
+        if (periodeResult.rows.length === 0) {
+          await pool.query('ROLLBACK');
+          return NextResponse.json(
+            { error: 'Période non trouvée' },
+            { status: 404 }
+          );
+        }
+
+        const periode = periodeResult.rows[0];
+
+        // Trouver la mission correspondante
+        const missionResult = await pool.query(
+          `SELECT id FROM mission 
+           WHERE date_debut = $1 AND date_fin = $2 
+           LIMIT 1`,
+          [periode.date_debut, periode.date_fin]
+        );
+
+        if (missionResult.rows.length === 0) {
+          await pool.query('ROLLBACK');
+          return NextResponse.json({
+            success: true,
+            deleted: 0,
+            message: 'Aucune évaluation trouvée',
+          });
+        }
+
+        const missionId = missionResult.rows[0].id;
+
+        // Supprimer les évaluations
+        const result = await pool.query(
+          `DELETE FROM evaluation
+           WHERE mission_id = $1
+             AND ville_id = $2
+             AND etablissement_visite_id = $3
+             AND controleur_id = $4
+             AND volet_id = $5`,
+          [
+            missionId,
+            parseInt(villeId, 10),
+            parseInt(etablissementId, 10),
+            parseInt(controleurId, 10),
+            parseInt(voletId, 10),
+          ]
+        );
+
+        await pool.query('COMMIT');
+        return NextResponse.json({
+          success: true,
+          deleted: result.rowCount,
+          message: `${result.rowCount} évaluation(s) supprimée(s)`,
+        });
+      }
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
+  } catch (error: any) {
+    console.error('Error deleting evaluation:', error);
+    return NextResponse.json(
+      { error: 'Erreur lors de la suppression' },
+      { status: 500 }
+    );
+  }
+}
+

@@ -293,10 +293,21 @@ export default function HomePage() {
       return;
     }
 
-    // Vérifier qu'au moins une rubrique a une note
-    const rubriquesAvecNote = Object.values(evaluations).filter((e) => e.note !== null);
-    if (rubriquesAvecNote.length === 0) {
-      toast.error('Veuillez évaluer au moins une rubrique');
+    // Trouver le volet actif et ses rubriques
+    const activeVolet = volets.find((v) => v.id === selectedVolet);
+    if (!activeVolet || !activeVolet.rubriques) {
+      toast.error('Volet invalide');
+      return;
+    }
+
+    // Vérifier que toutes les rubriques du volet ont une note
+    const rubriquesAvecNote = activeVolet.rubriques
+      .map((rubrique) => evaluations[rubrique.id])
+      .filter((e) => e && e.note !== null && e.note !== undefined);
+
+    if (rubriquesAvecNote.length !== activeVolet.rubriques.length) {
+      const rubriquesManquantes = activeVolet.rubriques.length - rubriquesAvecNote.length;
+      toast.error(`Veuillez attribuer une note à toutes les rubriques. Il manque ${rubriquesManquantes} note(s).`);
       return;
     }
 
@@ -323,6 +334,25 @@ export default function HomePage() {
       const missionData = await missionResponse.json();
       const missionId = missionData.mission?.id || missionData.id;
 
+      // Vérifier si une évaluation existe déjà pour cette combinaison
+      const checkResponse = await fetch(
+        `/api/evaluations/check?controleurId=${selectedControleur}&voletId=${selectedVolet}&periodeId=${selectedPeriode}&etablissementId=${selectedEtablissement}&villeId=${selectedVille}`
+      );
+      const checkData = await checkResponse.json();
+
+      let shouldReplace = false;
+      if (checkData.exists && checkData.evaluation) {
+        const confirmReplace = confirm(
+          `Une évaluation existe déjà pour ce contrôleur, ce volet, cette période et cet établissement (soumise le ${new Date(checkData.evaluation.created_at).toLocaleDateString('fr-FR')}).\n\nVoulez-vous remplacer l'ancienne évaluation par la nouvelle ?`
+        );
+        if (!confirmReplace) {
+          setIsSubmitting(false);
+          toast.info('Évaluation annulée. L\'ancienne évaluation est conservée.');
+          return;
+        }
+        shouldReplace = true;
+      }
+
       const response = await fetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -332,6 +362,7 @@ export default function HomePage() {
           etablissementVisiteId: selectedEtablissement,
           controleurId: selectedControleur,
           voletId: selectedVolet,
+          replace: shouldReplace,
           rubriques: rubriquesAvecNote.map((e) => ({
             rubriqueId: e.rubriqueId,
             note: e.note,

@@ -1,6 +1,7 @@
 import { getPool } from './db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { NextRequest } from 'next/server';
 
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 jours
 
@@ -179,5 +180,32 @@ export function hasRole(user: User | null, requiredRole: 'admin' | 'superviseur'
  */
 export function isAdmin(user: User | null): boolean {
   return hasRole(user, 'admin');
+}
+
+/**
+ * Vérifie l'authentification à partir d'une requête Next.js
+ * Retourne l'utilisateur et la session si authentifié
+ */
+export async function verifyAuth(request: NextRequest): Promise<{ user: User | null; session: Session | null }> {
+  // Récupérer le token depuis différents emplacements possibles
+  const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
+                request.nextUrl.searchParams.get('token') ||
+                request.cookies.get('session_token')?.value;
+
+  if (!token) {
+    return { user: null, session: null };
+  }
+
+  const session = await getSessionByToken(token);
+  if (!session) {
+    return { user: null, session: null };
+  }
+
+  const user = await getUserById(session.userId);
+  if (!user || !user.isActive) {
+    return { user: null, session: null };
+  }
+
+  return { user, session };
 }
 
