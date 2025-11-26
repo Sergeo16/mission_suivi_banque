@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { Settings, Users, Building2, Calendar, UserCheck, Shield, BarChart3, Download, FileText, Trash2, Eye, X, LogOut } from 'lucide-react';
+import { Settings, Users, Building2, Calendar, UserCheck, Shield, BarChart3, Download, FileText, Trash2, Eye, X, LogOut, Plus, Edit, RotateCcw } from 'lucide-react';
 
 interface Ville {
   id: number;
@@ -19,6 +19,8 @@ interface Periode {
   id: number;
   libelle: string;
   ville_id: number;
+  date_debut: string;
+  date_fin: string;
 }
 
 interface Controleur {
@@ -86,11 +88,11 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('sergeobusiness1@gmail.com');
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<'synthese' | 'controleurs' | 'evaluations' | 'maintenance' | 'users' | 'referentiels'>('synthese');
+  const [activeTab, setActiveTab] = useState<'synthese' | 'controleurs' | 'evaluations' | 'maintenance' | 'users' | 'referentiels' | 'restore'>('synthese');
 
   // Fonction helper pour récupérer le token d'authentification
   const getAuthToken = (): string | null => {
@@ -140,6 +142,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     checkAuthentication();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkAuthentication = async () => {
@@ -252,6 +255,7 @@ export default function AdminPage() {
       // Réinitialiser les stats si le volet est désélectionné
       setControleursStats(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, filterVille, filterEtablissement, filterPeriode, filterVolet]);
 
   const loadControleursStats = async () => {
@@ -687,6 +691,14 @@ export default function AdminPage() {
         >
           <Building2 className="mr-1 sm:mr-2" size={16} />
           <span className="hidden sm:inline">Référentiels</span>
+        </button>
+        <button
+          type="button"
+          className={`tab ${activeTab === 'restore' ? 'tab-active' : ''}`}
+          onClick={() => setActiveTab('restore')}
+        >
+          <Shield className="mr-1 sm:mr-2" size={16} />
+          <span className="hidden sm:inline">Restauration</span>
         </button>
       </div>
 
@@ -1373,30 +1385,1316 @@ export default function AdminPage() {
         </div>
       )}
 
-      {activeTab === 'referentiels' && (
-        <div className="card bg-base-100 shadow-xl">
-          <div className="card-body p-4 sm:p-6">
-            <h2 className="card-title mb-4 text-lg sm:text-xl">Gestion des Référentiels</h2>
-            <p className="text-sm sm:text-base text-gray-400 mb-4">
-              Interface de gestion des référentiels en cours de développement...
-            </p>
-            <div className="space-y-4">
-              <div className="alert alert-info">
-                <Building2 size={20} />
-                <span className="text-xs sm:text-sm">Gestion des villes et établissements</span>
+      {activeTab === 'referentiels' && <ReferentielsManagement 
+        villes={villes}
+        setVilles={setVilles}
+        getAuthHeaders={getAuthHeaders}
+        loadSyntheseData={loadSyntheseData}
+      />}
+
+      {activeTab === 'restore' && <RestoreManagement 
+        getAuthHeaders={getAuthHeaders}
+      />}
+    </div>
+  );
+}
+
+// Composant de restauration des éléments supprimés
+interface RestoreManagementProps {
+  getAuthHeaders: () => HeadersInit;
+}
+
+function RestoreManagement({ getAuthHeaders }: RestoreManagementProps) {
+  const [restoreTab, setRestoreTab] = useState<'villes' | 'etablissements' | 'controleurs' | 'periodes' | 'missions' | 'evaluations'>('villes');
+  const [deletedItems, setDeletedItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadDeletedItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restoreTab]);
+
+  const loadDeletedItems = async () => {
+    setLoading(true);
+    try {
+      let url = '';
+      switch (restoreTab) {
+        case 'villes':
+          url = '/api/villes?includeDeleted=true';
+          break;
+        case 'etablissements':
+          url = '/api/etablissements?includeDeleted=true';
+          break;
+        case 'controleurs':
+          url = '/api/controleurs?includeDeleted=true';
+          break;
+        case 'periodes':
+          url = '/api/periodes?includeDeleted=true';
+          break;
+        case 'missions':
+          url = '/api/missions?includeDeleted=true';
+          break;
+        case 'evaluations':
+          url = '/api/admin/evaluations?includeDeleted=true';
+          break;
+      }
+
+      const response = await fetch(url, {
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+
+      // Filtrer uniquement les éléments supprimés
+      if (restoreTab === 'villes') {
+        setDeletedItems((data.villes || []).filter((item: any) => item.deleted_at));
+      } else if (restoreTab === 'etablissements') {
+        setDeletedItems((data.etablissements || []).filter((item: any) => item.deleted_at));
+      } else if (restoreTab === 'controleurs') {
+        setDeletedItems((data.controleurs || []).filter((item: any) => item.deleted_at));
+      } else if (restoreTab === 'periodes') {
+        setDeletedItems((data.periodes || []).filter((item: any) => item.deleted_at));
+      } else if (restoreTab === 'missions') {
+        setDeletedItems((data.missions || []).filter((item: any) => item.deleted_at));
+      }
+    } catch (error) {
+      console.error('Error loading deleted items:', error);
+      toast.error('Erreur lors du chargement des éléments supprimés');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestore = async (id: number) => {
+    if (!confirm('Êtes-vous sûr de vouloir restaurer cet élément ?')) return;
+
+    try {
+      let url = '';
+      switch (restoreTab) {
+        case 'villes':
+          url = '/api/villes/restore';
+          break;
+        case 'etablissements':
+          url = '/api/etablissements/restore';
+          break;
+        case 'controleurs':
+          url = '/api/controleurs/restore';
+          break;
+        case 'periodes':
+          url = '/api/periodes/restore';
+          break;
+        case 'missions':
+          url = '/api/missions/restore';
+          break;
+        case 'evaluations':
+          url = '/api/admin/evaluations/restore';
+          break;
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ id }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+
+      toast.success(data.message || 'Élément restauré avec succès');
+      await loadDeletedItems();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la restauration');
+    }
+  };
+
+  const getTableHeaders = () => {
+    switch (restoreTab) {
+      case 'villes':
+        return ['ID', 'Nom', 'Date de suppression', 'Actions'];
+      case 'etablissements':
+        return ['ID', 'Nom', 'Ville', 'Date de suppression', 'Actions'];
+      case 'controleurs':
+        return ['ID', 'Nom', 'Prénom', 'Ville', 'Date de suppression', 'Actions'];
+      case 'periodes':
+        return ['ID', 'Libellé', 'Date début', 'Date fin', 'Date de suppression', 'Actions'];
+      case 'missions':
+        return ['ID', 'Nom', 'Date début', 'Date fin', 'Date de suppression', 'Actions'];
+      default:
+        return ['ID', 'Date de suppression', 'Actions'];
+    }
+  };
+
+  const renderTableRow = (item: any) => {
+    switch (restoreTab) {
+      case 'villes':
+        return (
+          <tr key={item.id}>
+            <td>{item.id}</td>
+            <td>{item.nom}</td>
+            <td>{new Date(item.deleted_at).toLocaleString('fr-FR')}</td>
+            <td>
+              <button
+                type="button"
+                className="btn btn-sm btn-success"
+                onClick={() => handleRestore(item.id)}
+              >
+                Restaurer
+              </button>
+            </td>
+          </tr>
+        );
+      case 'etablissements':
+        return (
+          <tr key={item.id}>
+            <td>{item.id}</td>
+            <td>{item.nom}</td>
+            <td>{item.ville_nom || item.ville_id}</td>
+            <td>{new Date(item.deleted_at).toLocaleString('fr-FR')}</td>
+            <td>
+              <button
+                type="button"
+                className="btn btn-sm btn-success"
+                onClick={() => handleRestore(item.id)}
+              >
+                Restaurer
+              </button>
+            </td>
+          </tr>
+        );
+      case 'controleurs':
+        return (
+          <tr key={item.id}>
+            <td>{item.id}</td>
+            <td>{item.nom}</td>
+            <td>{item.prenom}</td>
+            <td>{item.ville_id}</td>
+            <td>{new Date(item.deleted_at).toLocaleString('fr-FR')}</td>
+            <td>
+              <button
+                type="button"
+                className="btn btn-sm btn-success"
+                onClick={() => handleRestore(item.id)}
+              >
+                Restaurer
+              </button>
+            </td>
+          </tr>
+        );
+      case 'periodes':
+        return (
+          <tr key={item.id}>
+            <td>{item.id}</td>
+            <td>{item.libelle}</td>
+            <td>{new Date(item.date_debut).toLocaleDateString('fr-FR')}</td>
+            <td>{new Date(item.date_fin).toLocaleDateString('fr-FR')}</td>
+            <td>{new Date(item.deleted_at).toLocaleString('fr-FR')}</td>
+            <td>
+              <button
+                type="button"
+                className="btn btn-sm btn-success"
+                onClick={() => handleRestore(item.id)}
+              >
+                Restaurer
+              </button>
+            </td>
+          </tr>
+        );
+      case 'missions':
+        return (
+          <tr key={item.id}>
+            <td>{item.id}</td>
+            <td>{item.nom}</td>
+            <td>{new Date(item.date_debut).toLocaleDateString('fr-FR')}</td>
+            <td>{new Date(item.date_fin).toLocaleDateString('fr-FR')}</td>
+            <td>{new Date(item.deleted_at).toLocaleString('fr-FR')}</td>
+            <td>
+              <button
+                type="button"
+                className="btn btn-sm btn-success"
+                onClick={() => handleRestore(item.id)}
+              >
+                Restaurer
+              </button>
+            </td>
+          </tr>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="card bg-base-100 shadow-xl">
+        <div className="card-body p-4 sm:p-6">
+          <h2 className="card-title mb-4 text-lg sm:text-xl">Restauration des Éléments Supprimés</h2>
+          
+          <div className="tabs tabs-boxed mb-4">
+            <button
+              type="button"
+              className={`tab ${restoreTab === 'villes' ? 'tab-active' : ''}`}
+              onClick={() => setRestoreTab('villes')}
+            >
+              Villes
+            </button>
+            <button
+              type="button"
+              className={`tab ${restoreTab === 'etablissements' ? 'tab-active' : ''}`}
+              onClick={() => setRestoreTab('etablissements')}
+            >
+              Établissements
+            </button>
+            <button
+              type="button"
+              className={`tab ${restoreTab === 'controleurs' ? 'tab-active' : ''}`}
+              onClick={() => setRestoreTab('controleurs')}
+            >
+              Contrôleurs
+            </button>
+            <button
+              type="button"
+              className={`tab ${restoreTab === 'periodes' ? 'tab-active' : ''}`}
+              onClick={() => setRestoreTab('periodes')}
+            >
+              Périodes
+            </button>
+            <button
+              type="button"
+              className={`tab ${restoreTab === 'missions' ? 'tab-active' : ''}`}
+              onClick={() => setRestoreTab('missions')}
+            >
+              Missions
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center items-center py-8">
+              <span className="loading loading-spinner loading-lg"></span>
+            </div>
+          ) : deletedItems.length === 0 ? (
+            <div className="alert alert-info">
+              <span>Aucun élément supprimé trouvé pour cette catégorie.</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table table-zebra w-full">
+                <thead>
+                  <tr>
+                    {getTableHeaders().map((header) => (
+                      <th key={header}>{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {deletedItems.map((item) => renderTableRow(item))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Composant de gestion des référentiels
+interface ReferentielsManagementProps {
+  villes: Ville[];
+  setVilles: (villes: Ville[]) => void;
+  getAuthHeaders: () => HeadersInit;
+  loadSyntheseData: () => Promise<void>;
+}
+
+function ReferentielsManagement({ villes, setVilles, getAuthHeaders, loadSyntheseData }: ReferentielsManagementProps) {
+  const [referentielTab, setReferentielTab] = useState<'villes' | 'etablissements' | 'controleurs' | 'periodes' | 'missions'>('villes');
+  const [etablissements, setEtablissements] = useState<Etablissement[]>([]);
+  const [controleurs, setControleurs] = useState<Controleur[]>([]);
+  const [periodes, setPeriodes] = useState<Periode[]>([]);
+  const [missions, setMissions] = useState<any[]>([]);
+  
+  // États pour les formulaires
+  const [showVilleForm, setShowVilleForm] = useState(false);
+  const [editingVille, setEditingVille] = useState<Ville | null>(null);
+  const [villeFormData, setVilleFormData] = useState({ nom: '' });
+  
+  const [showEtablissementForm, setShowEtablissementForm] = useState(false);
+  const [editingEtablissement, setEditingEtablissement] = useState<Etablissement | null>(null);
+  const [etablissementFormData, setEtablissementFormData] = useState({ nom: '', villeId: 0 });
+  
+  const [showControleurForm, setShowControleurForm] = useState(false);
+  const [editingControleur, setEditingControleur] = useState<Controleur | null>(null);
+  const [controleurFormData, setControleurFormData] = useState({ nom: '', prenom: '', villeId: 0 });
+  
+  const [showPeriodeForm, setShowPeriodeForm] = useState(false);
+  const [editingPeriode, setEditingPeriode] = useState<Periode | null>(null);
+  const [periodeFormData, setPeriodeFormData] = useState({ libelle: '', date_debut: '', date_fin: '', villeId: 0 });
+  
+  const [showMissionForm, setShowMissionForm] = useState(false);
+  const [editingMission, setEditingMission] = useState<any | null>(null);
+  const [missionFormData, setMissionFormData] = useState({ nom: '', date_debut: '', date_fin: '' });
+
+  // Charger les données
+  useEffect(() => {
+    loadAllData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [referentielTab]);
+
+  const loadAllData = async () => {
+    try {
+      if (referentielTab === 'etablissements' || referentielTab === 'controleurs' || referentielTab === 'periodes') {
+        // Charger toutes les villes pour les filtres
+        const villesRes = await fetch('/api/villes');
+        const villesData = await villesRes.json();
+        setVilles(villesData.villes || []);
+      }
+      
+      if (referentielTab === 'etablissements') {
+        const res = await fetch('/api/etablissements');
+        const data = await res.json();
+        setEtablissements(data.etablissements || []);
+      } else if (referentielTab === 'controleurs') {
+        const res = await fetch('/api/controleurs');
+        const data = await res.json();
+        setControleurs(data.controleurs || []);
+      } else if (referentielTab === 'periodes') {
+        const res = await fetch('/api/periodes');
+        const data = await res.json();
+        setPeriodes(data.periodes || []);
+      } else if (referentielTab === 'missions') {
+        const res = await fetch('/api/missions');
+        const data = await res.json();
+        setMissions(data.missions || []);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast.error('Erreur lors du chargement des données');
+    }
+  };
+
+  // Gestion des villes
+  const handleVilleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const url = editingVille ? '/api/villes' : '/api/villes';
+      const method = editingVille ? 'PATCH' : 'POST';
+      const body = editingVille ? { id: editingVille.id, ...villeFormData } : villeFormData;
+      
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(body),
+      });
+      
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+      
+      toast.success(editingVille ? 'Ville modifiée avec succès' : 'Ville créée avec succès');
+      setShowVilleForm(false);
+      setEditingVille(null);
+      setVilleFormData({ nom: '' });
+      await loadSyntheseData();
+      await loadAllData();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la sauvegarde');
+    }
+  };
+
+  const handleDeleteVille = async (id: number) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette ville ?')) return;
+    try {
+      const response = await fetch(`/api/villes?id=${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+      toast.success('Ville supprimée avec succès');
+      await loadSyntheseData();
+      await loadAllData();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la suppression');
+    }
+  };
+
+  // Gestion des établissements
+  const handleEtablissementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const url = '/api/etablissements';
+      const method = editingEtablissement ? 'PATCH' : 'POST';
+      const body = editingEtablissement 
+        ? { id: editingEtablissement.id, nom: etablissementFormData.nom, villeId: etablissementFormData.villeId }
+        : { nom: etablissementFormData.nom, villeId: etablissementFormData.villeId };
+      
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(body),
+      });
+      
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+      
+      toast.success(editingEtablissement ? 'Établissement modifié avec succès' : 'Établissement créé avec succès');
+      setShowEtablissementForm(false);
+      setEditingEtablissement(null);
+      setEtablissementFormData({ nom: '', villeId: 0 });
+      await loadAllData();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la sauvegarde');
+    }
+  };
+
+  const handleDeleteEtablissement = async (id: number) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cet établissement ?')) return;
+    try {
+      const response = await fetch(`/api/etablissements?id=${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+      toast.success('Établissement supprimé avec succès');
+      await loadAllData();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la suppression');
+    }
+  };
+
+  // Gestion des contrôleurs
+  const handleControleurSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const url = '/api/controleurs';
+      const method = editingControleur ? 'PATCH' : 'POST';
+      const body = editingControleur
+        ? { id: editingControleur.id, nom: controleurFormData.nom, prenom: controleurFormData.prenom, villeId: controleurFormData.villeId }
+        : { nom: controleurFormData.nom, prenom: controleurFormData.prenom, villeId: controleurFormData.villeId };
+      
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(body),
+      });
+      
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+      
+      toast.success(editingControleur ? 'Contrôleur modifié avec succès' : 'Contrôleur créé avec succès');
+      setShowControleurForm(false);
+      setEditingControleur(null);
+      setControleurFormData({ nom: '', prenom: '', villeId: 0 });
+      await loadAllData();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la sauvegarde');
+    }
+  };
+
+  const handleDeleteControleur = async (id: number) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce contrôleur ?')) return;
+    try {
+      const response = await fetch(`/api/controleurs?id=${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+      toast.success('Contrôleur supprimé avec succès');
+      await loadAllData();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la suppression');
+    }
+  };
+
+  // Gestion des périodes
+  const handlePeriodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const url = '/api/periodes';
+      const method = editingPeriode ? 'PATCH' : 'POST';
+      const body = editingPeriode
+        ? { id: editingPeriode.id, libelle: periodeFormData.libelle, date_debut: periodeFormData.date_debut, date_fin: periodeFormData.date_fin, villeId: periodeFormData.villeId }
+        : { libelle: periodeFormData.libelle, date_debut: periodeFormData.date_debut, date_fin: periodeFormData.date_fin, villeId: periodeFormData.villeId };
+      
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(body),
+      });
+      
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+      
+      toast.success(editingPeriode ? 'Période modifiée avec succès' : 'Période créée avec succès');
+      setShowPeriodeForm(false);
+      setEditingPeriode(null);
+      setPeriodeFormData({ libelle: '', date_debut: '', date_fin: '', villeId: 0 });
+      await loadAllData();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la sauvegarde');
+    }
+  };
+
+  const handleDeletePeriode = async (id: number) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette période ?')) return;
+    try {
+      const response = await fetch(`/api/periodes?id=${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+      toast.success('Période supprimée avec succès');
+      await loadAllData();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la suppression');
+    }
+  };
+
+  // Gestion des missions
+  const handleMissionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const url = '/api/missions';
+      const method = editingMission ? 'PATCH' : 'POST';
+      const body = editingMission
+        ? { id: editingMission.id, nom: missionFormData.nom, date_debut: missionFormData.date_debut, date_fin: missionFormData.date_fin }
+        : { nom: missionFormData.nom, date_debut: missionFormData.date_debut, date_fin: missionFormData.date_fin };
+      
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(body),
+      });
+      
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+      
+      toast.success(editingMission ? 'Mission modifiée avec succès' : 'Mission créée avec succès');
+      setShowMissionForm(false);
+      setEditingMission(null);
+      setMissionFormData({ nom: '', date_debut: '', date_fin: '' });
+      await loadAllData();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la sauvegarde');
+    }
+  };
+
+  const handleDeleteMission = async (id: number) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette mission ?')) return;
+    try {
+      const response = await fetch(`/api/missions?id=${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur');
+      toast.success('Mission supprimée avec succès');
+      await loadAllData();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la suppression');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="card bg-base-100 shadow-xl">
+        <div className="card-body p-4 sm:p-6">
+          <h2 className="card-title mb-4 text-lg sm:text-xl">Gestion des Référentiels</h2>
+          
+          <div className="tabs tabs-boxed mb-4">
+            <button
+              type="button"
+              className={`tab ${referentielTab === 'villes' ? 'tab-active' : ''}`}
+              onClick={() => setReferentielTab('villes')}
+            >
+              <Building2 className="mr-2" size={16} />
+              Villes
+            </button>
+            <button
+              type="button"
+              className={`tab ${referentielTab === 'etablissements' ? 'tab-active' : ''}`}
+              onClick={() => setReferentielTab('etablissements')}
+            >
+              <Building2 className="mr-2" size={16} />
+              Établissements
+            </button>
+            <button
+              type="button"
+              className={`tab ${referentielTab === 'controleurs' ? 'tab-active' : ''}`}
+              onClick={() => setReferentielTab('controleurs')}
+            >
+              <UserCheck className="mr-2" size={16} />
+              Contrôleurs
+            </button>
+            <button
+              type="button"
+              className={`tab ${referentielTab === 'periodes' ? 'tab-active' : ''}`}
+              onClick={() => setReferentielTab('periodes')}
+            >
+              <Calendar className="mr-2" size={16} />
+              Périodes
+            </button>
+            <button
+              type="button"
+              className={`tab ${referentielTab === 'missions' ? 'tab-active' : ''}`}
+              onClick={() => setReferentielTab('missions')}
+            >
+              <Calendar className="mr-2" size={16} />
+              Missions
+            </button>
+          </div>
+
+          {/* Gestion des Villes */}
+          {referentielTab === 'villes' && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">Villes</h3>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    setEditingVille(null);
+                    setVilleFormData({ nom: '' });
+                    setShowVilleForm(true);
+                  }}
+                >
+                  <Plus size={16} className="mr-2" />
+                  Ajouter une ville
+                </button>
               </div>
-              <div className="alert alert-info">
-                <Calendar size={20} />
-                <span className="text-xs sm:text-sm">Gestion des missions</span>
-              </div>
-              <div className="alert alert-info">
-                <UserCheck size={20} />
-                <span className="text-xs sm:text-sm">Gestion des contrôleurs</span>
+              
+              {showVilleForm && (
+                <div className="card bg-base-200 mb-4">
+                  <div className="card-body">
+                    <h4 className="card-title text-sm">{editingVille ? 'Modifier' : 'Créer'} une ville</h4>
+                    <form onSubmit={handleVilleSubmit}>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Nom de la ville</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="input input-bordered"
+                          value={villeFormData.nom}
+                          onChange={(e) => setVilleFormData({ nom: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="submit" className="btn btn-primary btn-sm">
+                          {editingVille ? 'Modifier' : 'Créer'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => {
+                            setShowVilleForm(false);
+                            setEditingVille(null);
+                            setVilleFormData({ nom: '' });
+                          }}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="table table-zebra w-full">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Nom</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {villes.map((ville) => (
+                      <tr key={ville.id}>
+                        <td>{ville.id}</td>
+                        <td>{ville.nom}</td>
+                        <td>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => {
+                                setEditingVille(ville);
+                                setVilleFormData({ nom: ville.nom });
+                                setShowVilleForm(true);
+                              }}
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-error"
+                              onClick={() => handleDeleteVille(ville.id)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Gestion des Établissements */}
+          {referentielTab === 'etablissements' && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">Établissements</h3>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    setEditingEtablissement(null);
+                    setEtablissementFormData({ nom: '', villeId: villes[0]?.id || 0 });
+                    setShowEtablissementForm(true);
+                  }}
+                >
+                  <Plus size={16} className="mr-2" />
+                  Ajouter un établissement
+                </button>
+              </div>
+              
+              {showEtablissementForm && (
+                <div className="card bg-base-200 mb-4">
+                  <div className="card-body">
+                    <h4 className="card-title text-sm">{editingEtablissement ? 'Modifier' : 'Créer'} un établissement</h4>
+                    <form onSubmit={handleEtablissementSubmit}>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Ville</span>
+                        </label>
+                        <select
+                          className="select select-bordered"
+                          value={etablissementFormData.villeId}
+                          onChange={(e) => setEtablissementFormData({ ...etablissementFormData, villeId: parseInt(e.target.value) })}
+                          required
+                        >
+                          <option value={0}>Sélectionner une ville</option>
+                          {villes.map((ville) => (
+                            <option key={ville.id} value={ville.id}>
+                              {ville.nom}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Nom de l&apos;établissement</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="input input-bordered"
+                          value={etablissementFormData.nom}
+                          onChange={(e) => setEtablissementFormData({ ...etablissementFormData, nom: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="submit" className="btn btn-primary btn-sm">
+                          {editingEtablissement ? 'Modifier' : 'Créer'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => {
+                            setShowEtablissementForm(false);
+                            setEditingEtablissement(null);
+                            setEtablissementFormData({ nom: '', villeId: 0 });
+                          }}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="table table-zebra w-full">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Nom</th>
+                      <th>Ville</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {etablissements.map((etab) => {
+                      const ville = villes.find((v) => v.id === etab.ville_id);
+                      return (
+                        <tr key={etab.id}>
+                          <td>{etab.id}</td>
+                          <td>{etab.nom}</td>
+                          <td>{ville?.nom || etab.ville_id}</td>
+                          <td>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-ghost"
+                                onClick={() => {
+                                  setEditingEtablissement(etab);
+                                  setEtablissementFormData({ nom: etab.nom, villeId: etab.ville_id });
+                                  setShowEtablissementForm(true);
+                                }}
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-error"
+                                onClick={() => handleDeleteEtablissement(etab.id)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Gestion des Contrôleurs */}
+          {referentielTab === 'controleurs' && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">Contrôleurs</h3>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    setEditingControleur(null);
+                    setControleurFormData({ nom: '', prenom: '', villeId: villes[0]?.id || 0 });
+                    setShowControleurForm(true);
+                  }}
+                >
+                  <Plus size={16} className="mr-2" />
+                  Ajouter un contrôleur
+                </button>
+              </div>
+              
+              {showControleurForm && (
+                <div className="card bg-base-200 mb-4">
+                  <div className="card-body">
+                    <h4 className="card-title text-sm">{editingControleur ? 'Modifier' : 'Créer'} un contrôleur</h4>
+                    <form onSubmit={handleControleurSubmit}>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Ville</span>
+                        </label>
+                        <select
+                          className="select select-bordered"
+                          value={controleurFormData.villeId}
+                          onChange={(e) => setControleurFormData({ ...controleurFormData, villeId: parseInt(e.target.value) })}
+                          required
+                        >
+                          <option value={0}>Sélectionner une ville</option>
+                          {villes.map((ville) => (
+                            <option key={ville.id} value={ville.id}>
+                              {ville.nom}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Nom</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="input input-bordered"
+                          value={controleurFormData.nom}
+                          onChange={(e) => setControleurFormData({ ...controleurFormData, nom: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Prénom</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="input input-bordered"
+                          value={controleurFormData.prenom}
+                          onChange={(e) => setControleurFormData({ ...controleurFormData, prenom: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="submit" className="btn btn-primary btn-sm">
+                          {editingControleur ? 'Modifier' : 'Créer'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => {
+                            setShowControleurForm(false);
+                            setEditingControleur(null);
+                            setControleurFormData({ nom: '', prenom: '', villeId: 0 });
+                          }}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="table table-zebra w-full">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Nom</th>
+                      <th>Prénom</th>
+                      <th>Ville</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {controleurs.map((controleur) => {
+                      const ville = villes.find((v) => v.id === controleur.ville_id);
+                      return (
+                        <tr key={controleur.id}>
+                          <td>{controleur.id}</td>
+                          <td>{controleur.nom}</td>
+                          <td>{controleur.prenom}</td>
+                          <td>{ville?.nom || controleur.ville_id}</td>
+                          <td>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-ghost"
+                                onClick={() => {
+                                  setEditingControleur(controleur);
+                                  setControleurFormData({ nom: controleur.nom, prenom: controleur.prenom, villeId: controleur.ville_id });
+                                  setShowControleurForm(true);
+                                }}
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-error"
+                                onClick={() => handleDeleteControleur(controleur.id)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Gestion des Périodes */}
+          {referentielTab === 'periodes' && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">Périodes</h3>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    setEditingPeriode(null);
+                    setPeriodeFormData({ libelle: '', date_debut: '', date_fin: '', villeId: villes[0]?.id || 0 });
+                    setShowPeriodeForm(true);
+                  }}
+                >
+                  <Plus size={16} className="mr-2" />
+                  Ajouter une période
+                </button>
+              </div>
+              
+              {showPeriodeForm && (
+                <div className="card bg-base-200 mb-4">
+                  <div className="card-body">
+                    <h4 className="card-title text-sm">{editingPeriode ? 'Modifier' : 'Créer'} une période</h4>
+                    <form onSubmit={handlePeriodeSubmit}>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Ville</span>
+                        </label>
+                        <select
+                          className="select select-bordered"
+                          value={periodeFormData.villeId}
+                          onChange={(e) => setPeriodeFormData({ ...periodeFormData, villeId: parseInt(e.target.value) })}
+                          required
+                        >
+                          <option value={0}>Sélectionner une ville</option>
+                          {villes.map((ville) => (
+                            <option key={ville.id} value={ville.id}>
+                              {ville.nom}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Libellé</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="input input-bordered"
+                          value={periodeFormData.libelle}
+                          onChange={(e) => setPeriodeFormData({ ...periodeFormData, libelle: e.target.value })}
+                          placeholder="Ex: Du 17/11/2025 au 21/11/2025"
+                          required
+                        />
+                      </div>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Date de début</span>
+                        </label>
+                        <input
+                          type="date"
+                          className="input input-bordered"
+                          value={periodeFormData.date_debut}
+                          onChange={(e) => setPeriodeFormData({ ...periodeFormData, date_debut: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Date de fin</span>
+                        </label>
+                        <input
+                          type="date"
+                          className="input input-bordered"
+                          value={periodeFormData.date_fin}
+                          onChange={(e) => setPeriodeFormData({ ...periodeFormData, date_fin: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="submit" className="btn btn-primary btn-sm">
+                          {editingPeriode ? 'Modifier' : 'Créer'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => {
+                            setShowPeriodeForm(false);
+                            setEditingPeriode(null);
+                            setPeriodeFormData({ libelle: '', date_debut: '', date_fin: '', villeId: 0 });
+                          }}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="table table-zebra w-full">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Libellé</th>
+                      <th>Date début</th>
+                      <th>Date fin</th>
+                      <th>Ville</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periodes.map((periode) => {
+                      const ville = villes.find((v) => v.id === periode.ville_id);
+                      return (
+                        <tr key={periode.id}>
+                          <td>{periode.id}</td>
+                          <td>{periode.libelle}</td>
+                          <td>{new Date(periode.date_debut).toLocaleDateString('fr-FR')}</td>
+                          <td>{new Date(periode.date_fin).toLocaleDateString('fr-FR')}</td>
+                          <td>{ville?.nom || periode.ville_id}</td>
+                          <td>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-ghost"
+                                onClick={() => {
+                                  setEditingPeriode(periode);
+                                  setPeriodeFormData({ 
+                                    libelle: periode.libelle, 
+                                    date_debut: periode.date_debut, 
+                                    date_fin: periode.date_fin, 
+                                    villeId: periode.ville_id 
+                                  });
+                                  setShowPeriodeForm(true);
+                                }}
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-error"
+                                onClick={() => handleDeletePeriode(periode.id)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Gestion des Missions */}
+          {referentielTab === 'missions' && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">Missions</h3>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    setEditingMission(null);
+                    setMissionFormData({ nom: '', date_debut: '', date_fin: '' });
+                    setShowMissionForm(true);
+                  }}
+                >
+                  <Plus size={16} className="mr-2" />
+                  Ajouter une mission
+                </button>
+              </div>
+              
+              {showMissionForm && (
+                <div className="card bg-base-200 mb-4">
+                  <div className="card-body">
+                    <h4 className="card-title text-sm">{editingMission ? 'Modifier' : 'Créer'} une mission</h4>
+                    <form onSubmit={handleMissionSubmit}>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Nom de la mission</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="input input-bordered"
+                          value={missionFormData.nom}
+                          onChange={(e) => setMissionFormData({ ...missionFormData, nom: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Date de début</span>
+                        </label>
+                        <input
+                          type="date"
+                          className="input input-bordered"
+                          value={missionFormData.date_debut}
+                          onChange={(e) => setMissionFormData({ ...missionFormData, date_debut: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="form-control mb-2">
+                        <label className="label">
+                          <span className="label-text">Date de fin</span>
+                        </label>
+                        <input
+                          type="date"
+                          className="input input-bordered"
+                          value={missionFormData.date_fin}
+                          onChange={(e) => setMissionFormData({ ...missionFormData, date_fin: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="submit" className="btn btn-primary btn-sm">
+                          {editingMission ? 'Modifier' : 'Créer'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => {
+                            setShowMissionForm(false);
+                            setEditingMission(null);
+                            setMissionFormData({ nom: '', date_debut: '', date_fin: '' });
+                          }}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="table table-zebra w-full">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Nom</th>
+                      <th>Date début</th>
+                      <th>Date fin</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {missions.map((mission) => (
+                      <tr key={mission.id}>
+                        <td>{mission.id}</td>
+                        <td>{mission.nom}</td>
+                        <td>{new Date(mission.date_debut).toLocaleDateString('fr-FR')}</td>
+                        <td>{new Date(mission.date_fin).toLocaleDateString('fr-FR')}</td>
+                        <td>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => {
+                                setEditingMission(mission);
+                                setMissionFormData({ nom: mission.nom, date_debut: mission.date_debut, date_fin: mission.date_fin });
+                                setShowMissionForm(true);
+                              }}
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-error"
+                              onClick={() => handleDeleteMission(mission.id)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

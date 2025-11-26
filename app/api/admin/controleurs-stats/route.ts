@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { verifyAuth } from '@/lib/auth';
+import { hasDeletedAtColumn } from '@/lib/soft-delete';
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,11 +67,15 @@ export async function GET(request: NextRequest) {
       ? `WHERE ${whereConditions.join(' AND ')}`
       : '';
 
+    // Vérifier si deleted_at existe
+    const hasDeletedAt = await hasDeletedAtColumn('controleur');
+    const deletedAtCondition = hasDeletedAt ? 'AND c.deleted_at IS NULL' : '';
+    
     // Récupérer tous les contrôleurs pour cette ville/établissement
     const controleursQuery = `
       SELECT DISTINCT c.id, c.nom, c.prenom
       FROM controleur c
-      ${villeId ? `WHERE c.ville_id = $${params.length + 1}` : ''}
+      ${villeId ? `WHERE c.ville_id = $${params.length + 1} ${deletedAtCondition}` : hasDeletedAt ? `WHERE c.deleted_at IS NULL` : ''}
       ORDER BY c.nom, c.prenom
     `;
     
@@ -103,7 +108,7 @@ export async function GET(request: NextRequest) {
           c.nom,
           c.prenom
         FROM evaluation ev
-        JOIN controleur c ON ev.controleur_id = c.id
+        JOIN controleur c ON ev.controleur_id = c.id ${hasDeletedAt ? 'AND c.deleted_at IS NULL' : ''}
         ${whereClause}
         ORDER BY ev.controleur_id, ev.volet_id, ev.mission_id, ev.ville_id, ev.etablissement_visite_id, ev.created_at DESC
       ) AS evaluations_uniques

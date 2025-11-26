@@ -163,8 +163,9 @@ async function seed() {
     }
 
     // Créer l'utilisateur admin par défaut
+    // Utiliser ADMIN_PASSWORD si défini, sinon utiliser la valeur par défaut pour le développement local
     const adminEmail = 'sergeobusiness1@gmail.com';
-    const adminPassword = 'Pass_w0rd';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const passwordHash = await hashPassword(adminPassword);
     
     try {

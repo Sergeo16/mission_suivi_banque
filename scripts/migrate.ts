@@ -51,6 +51,7 @@ async function migrate() {
       '002_add_rubrique_columns_and_periodes.sql',
       '003_create_users_table.sql',
       '004_create_app_settings_table.sql',
+      '005_add_soft_delete.sql',
     ];
     
     let allSqlContent = '';

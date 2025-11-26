@@ -188,8 +188,8 @@ export async function DELETE(request: NextRequest) {
 
     try {
       if (deleteAll) {
-        // Supprimer toutes les évaluations
-        const result = await pool.query('DELETE FROM evaluation RETURNING id');
+        // Soft delete : marquer toutes les évaluations comme supprimées
+        const result = await pool.query('UPDATE evaluation SET deleted_at = NOW() WHERE deleted_at IS NULL RETURNING id');
         await pool.query('COMMIT');
         return NextResponse.json({
           success: true,
@@ -241,14 +241,15 @@ export async function DELETE(request: NextRequest) {
 
         const missionId = missionResult.rows[0].id;
 
-        // Supprimer les évaluations
+        // Soft delete : marquer les évaluations comme supprimées
         const result = await pool.query(
-          `DELETE FROM evaluation
+          `UPDATE evaluation SET deleted_at = NOW()
            WHERE mission_id = $1
              AND ville_id = $2
              AND etablissement_visite_id = $3
              AND controleur_id = $4
-             AND volet_id = $5`,
+             AND volet_id = $5
+             AND deleted_at IS NULL`,
           [
             missionId,
             parseInt(villeId, 10),
